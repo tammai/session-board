@@ -1,0 +1,52 @@
+{
+  "name": "session-board",
+  "version": "0.1.0",
+  "description": "A live board for Claude Code: model, context, limits and cost, AI-SDLC progress read from your repo, subagent cards and every permission check. Read-only; unreadable values show N/A.",
+  "author": { "name": "Tam Mai", "url": "https://github.com/tammai" },
+  "homepage": "https://github.com/tammai/session-board",
+  "repository": "https://github.com/tammai/session-board",
+  "license": "MIT",
+  "keywords": ["claude-code", "claude-code-mod", "dashboard", "subagents", "ai-sdlc", "statusline"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "panels": {
+      "title": "Panels",
+      "description": "Comma-separated panels in display order: main, sdlc, agents, gate. Leave one out to hide it.",
+      "type": "string",
+      "default": "main,sdlc,agents,gate"
+    },
+    "layout": {
+      "title": "Layout",
+      "description": "auto: a summary above the prompt when the pane sits inline, two columns from 110 columns when docked, one column otherwise",
+      "type": "string",
+      "options": ["auto", "compact", "wide"],
+      "default": "auto"
+    },
+    "maxCards": {
+      "title": "Cards before swimlanes",
+      "description": "Agent cards drawn side by side; more agents than this switch to swimlanes (1-6)",
+      "type": "number",
+      "default": 3
+    },
+    "motion": {
+      "title": "Motion",
+      "description": "Animate the connectors while real work flows, or keep them still",
+      "type": "string",
+      "options": ["while-active", "off"],
+      "default": "while-active"
+    },
+    "palette": {
+      "title": "Palette",
+      "description": "theme follows your Claude Code theme; pastel is fixed colours tuned for dark terminals",
+      "type": "string",
+      "options": ["theme", "pastel"],
+      "default": "theme"
+    },
+    "openOnStart": {
+      "title": "Open on start",
+      "description": "Open the board when a session starts",
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

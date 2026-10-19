@@ -1,0 +1,8 @@
+session-board
+Copyright (c) 2026 Tam Mai
+
+This project is a fork of claude-flightdeck by Stephen Casella
+(https://github.com/scasella/claude-flightdeck, MIT, commit 6150b9f).
+The agents panel, the permission gate panel, the pane and band layout, the
+animated rail and the clocks, and the pure reducers in hooks/core.ts derive
+from that work. Its copyright notice is kept in LICENSE.
