@@ -1,6 +1,12 @@
 import { expect, test } from 'claude-code/testing'
 
-import { describeInput, effortFromSettings, normalizeSdlc, redact } from '../hooks/core'
+import { describeInput, effortFromSettings, normalizeCard, normalizeSdlc, redact, uniqueCards } from '../hooks/core'
+
+test('a resumed agent keeps one card: its id is drawn once, by its latest spawn', () => {
+  const card = (id: string, description: string) => ({ ...normalizeCard({}), id, description })
+  const cards = uniqueCards([card('a1', 'Write plan'), card('b2', 'Audit'), card('a1', 'Revise plan')])
+  expect(cards.map(c => `${c.id}:${c.description}`)).toEqual(['b2:Audit', 'a1:Revise plan'])
+})
 
 test('redaction masks credentials before anything is stored', () => {
   expect(redact('curl -H "Authorization: Bearer abc.def.ghi123" x')).not.toContain('abc.def')

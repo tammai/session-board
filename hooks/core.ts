@@ -51,6 +51,9 @@ export const normalizeGate = (stored: unknown): Gate => {
   }
 }
 
+/** One card per agent id, the latest spawn winning: a resumed agent spawns again under the id it had, and a card's clock is keyed by it. */
+export const uniqueCards = (cards: AgentCard[]): AgentCard[] => cards.filter((c, i) => !cards.some((d, j) => j > i && d.id === c.id))
+
 export const normalizeCard = (stored: unknown): AgentCard =>
   normalize<AgentCard>(
     {

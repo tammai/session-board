@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (2026-10-20)
+
+- **Fix:** the board no longer goes blank when an agent is resumed. A resumed agent spawned a second card under the same id, the
+  engine refused to draw its clock twice, and the whole pane was dropped. Each agent now has one card.
+
 ## 0.1.1 (2026-10-20)
 
 - **Fix:** a leftover `verify.md` no longer ticks build and verify while an earlier step (spec, plan) is still in progress.

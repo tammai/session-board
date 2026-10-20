@@ -24,6 +24,7 @@ import {
   listOf,
   normalize,
   normalizeCard,
+  uniqueCards,
   normalizeGate,
   normalizeSdlc,
   noteTool,
@@ -62,7 +63,7 @@ const getUsage = async ($: EngineInterface): Promise<Usage> => {
   return { ...u, limits: Array.isArray(u.limits) ? u.limits : [] }
 }
 const getGate = async ($: EngineInterface): Promise<Gate> => normalizeGate(await read($, gate))
-const getCards = async ($: EngineInterface): Promise<AgentCard[]> => listOf<unknown>(await read($, agents)).map(normalizeCard)
+const getCards = async ($: EngineInterface): Promise<AgentCard[]> => uniqueCards(listOf<unknown>(await read($, agents)).map(normalizeCard))
 const getView = async ($: EngineInterface): Promise<View> => normalize(DEFAULT_VIEW, await read($, view))
 const getSdlc = async ($: EngineInterface): Promise<Sdlc | null> => normalizeSdlc(await read($, sdlc))
 const getStatus = async ($: EngineInterface): Promise<Status> => normalize(DEFAULT_STATUS, await read($, status))
@@ -285,7 +286,7 @@ export const register: Register = (on, options) => {
       description: clean(e.description),
       spawnedAt: await $.clock.now(),
     }
-    await update($, agents, list => [...listOf<unknown>(list).map(normalizeCard), card].slice(-24))
+    await update($, agents, list => uniqueCards([...listOf<unknown>(list).map(normalizeCard), card]).slice(-24))
     return started
   })
 
