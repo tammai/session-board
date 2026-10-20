@@ -257,7 +257,7 @@ const expectStepper = async (ui: Mounted, surface: string, icons: string, alt: s
 }
 
 
-test('the AI-SDLC section shows the stepper, build rounds and one checklist: working, pending, done', async ($, on) => {
+test('the AI-SDLC section shows the stepper, build rounds, the intents (working, done) and the backlog', async ($, on) => {
   host(on)
   await begin($)
   for (const surface of SURFACES) {
@@ -275,20 +275,23 @@ test('the AI-SDLC section shows the stepper, build rounds and one checklist: wor
     await has(/^unverified edits$/)
     await has(/^spec 2\/3 pass sonnet$/)
     await has(/^implementer ai-sdlc:implementer \(sonnet\)$/)
-    // one list: what is being worked on first, the backlog next, finished changes last
-    // an empty row sits above the list, which is titled "Tasks"
+    // two lists: the intents (being worked on first, finished last) and the backlog still to come
+    // an empty row sits above each list, which is titled "Intents" or "Backlog"
     const drawn = JSON.stringify(await ui.drawn())
-    expect(await ui.find({ key: 'checklist-gap' })).toBeDefined()
-    expect(drawn.indexOf('checklist-gap')).toBeGreaterThan(0)
-    expect(drawn.indexOf('checklist-gap')).toBeLessThan(drawn.indexOf('"key":"checklist"'))
-    const heading = await ui.find({ type: 'Text', text: /^Tasks$/ })
-    expect(heading?.props.color).toBe('#ffffff') // white
-    expect(heading?.props.backgroundColor).toBeUndefined() // no chip: the board's own dark background
-    // a line runs from the title across the rest of the row: the 96 inner columns less "Tasks" and the gap
-    expectRule(await ui.find({ key: 'checklist-head' }), surface, `Tasks${'─'.repeat(90)}`)
-    if (surface === 'terminal') expect((await ui.find({ text: /^─{90}$/ }))?.props.color).toBe('#87ceeb') // the Tasks line, not a stepper line
-    const list = await rowOf(ui, 'checklist')
-    expect(surface === 'terminal' ? list : list.replace(/^Tasks/, 'Tasks' + '─'.repeat(90))).toBe(`Tasks${'─'.repeat(90)}[>] ${ID} · review[ ] D1 Worktree support[ ] L2 session-board, remade separately[x] ${SHIPPED}`)
+    expect(drawn.indexOf('"key":"section-Intents"')).toBeGreaterThan(0)
+    expect(drawn.indexOf('"key":"section-Intents"')).toBeLessThan(drawn.indexOf('"key":"section-Backlog"'))
+    for (const title of ['Intents', 'Backlog']) {
+      const heading = await ui.find({ type: 'Text', text: new RegExp(`^${title}$`) })
+      expect(heading?.props.color).toBe('#ffffff') // white
+      expect(heading?.props.backgroundColor).toBeUndefined() // no chip: the board's own dark background
+      // a line runs from the title across the rest of the row: the 96 inner columns less the title and the gap
+      expectRule(await ui.find({ key: `${title}-head` }), surface, `${title}${'─'.repeat(88)}`)
+    }
+    expect(await ui.find({ text: /^Tasks$/ })).toBeUndefined()
+    if (surface === 'terminal') expect((await ui.find({ text: /^─{88}$/ }))?.props.color).toBe('#87ceeb') // a list's line, not a stepper line
+    const withRule = (title: string, list: string) => (surface === 'terminal' ? list : list.replace(new RegExp(`^${title}`), title + '─'.repeat(88)))
+    expect(withRule('Intents', await rowOf(ui, 'section-Intents'))).toBe(`Intents${'─'.repeat(88)}[>] ${ID} · review[x] ${SHIPPED}`)
+    expect(withRule('Backlog', await rowOf(ui, 'section-Backlog'))).toBe(`Backlog${'─'.repeat(88)}[ ] D1 Worktree support[ ] L2 session-board, remade separately`)
     // the metrics row is gone
     for (const gone of [/^shipped /, /^spec rework /, /^plan edits /, /^guard denials /]) expect(await ui.find({ text: gone })).toBeUndefined()
     await ui.unmount()
@@ -364,7 +367,7 @@ test('on the terminal long names are cut at a character count; on desktop the ho
   await begin($)
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...pane(64), surface }) // a name of 59 characters does not fit 40 terminal columns
-    const list = await rowOf(ui, 'checklist')
+    const list = await rowOf(ui, 'section-Intents')
     const git = await rowOf(ui, 'main-git')
     if (surface === 'terminal') {
       expect(list).toContain('…') // the id is cut to fit the columns
@@ -466,7 +469,7 @@ test('a project with only .sdlc/config.json shows the section with what is missi
     const ui = await $.ui.mount({ ...pane(110), surface })
     expect(await ui.find({ text: /^AI-SDLC$/ })).toBeDefined()
     expect(await ui.find({ text: /^no active change$/ })).toBeDefined()
-    expect(await ui.find({ text: /^pending N\/A$/ })).toBeDefined() // no backlog to read
+    expect(await ui.find({ text: /^Backlog$/ })).toBeUndefined() // no backlog to read: no Backlog list
     await ui.unmount()
   }
 })
@@ -677,7 +680,7 @@ test('seated inline above the prompt the pane is the band: the Status row and on
   const ui = await $.ui.mount({ ...inline, surface: 'terminal' })
   expect(await ui.find({ key: 'band-main' })).toBeDefined()
   expect(await rowOf(ui, 'band-progress')).toBe('AI-SDLC ✔─✔─✔─✔─✔─◉─○─○  now Review · next Ship')
-  expect(await ui.find({ text: /^Tasks$/ })).toBeUndefined() // not the full card
+  expect(await ui.find({ text: /^Intents$/ })).toBeUndefined() // not the full card
   await ui.unmount()
 })
 

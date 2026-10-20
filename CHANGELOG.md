@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5 (2026-10-20)
+
+- **Change:** the AI-SDLC card's Tasks list is now two lists: Intents (the changes being worked on, then the finished ones) and
+  Backlog (the next items from `docs/project/backlog.md`). The Backlog list is hidden when the backlog can't be read or has no items.
+  The 10-row cap and the 4-item backlog limit are unchanged.
+
 ## 0.1.4 (2026-10-20)
 
 - **Fix:** a finished change in the Tasks list is cut at the edge of the row, not 20 columns short of it. Working and pending rows are unchanged.

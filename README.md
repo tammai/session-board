@@ -40,8 +40,8 @@ The gauges are drawn as in a status line: five block cells, green to 50%, orange
   up to the current step; narrow boards name only the current step and show the others by their first letter; the desktop
   app draws it as an SVG;
 - the step now and the step next, unverified edits, build rounds against the cap and the implementer;
-- **Tasks**, one list of at most 10: `[>]` the changes being worked on, `[ ]` the next backlog items (up to 4), `[x]` finished
-  changes, newest closed first.
+- **Intents**: `[>]` the changes being worked on, then `[x]` finished changes, newest closed first.
+- **Backlog**: `[ ]` the next backlog items (up to 4). Together the two lists hold at most 10 rows.
 
 **Agents** shows subagents as side-by-side cards with live context and a clock, switching to swimlanes when there are many.
 

@@ -233,6 +233,22 @@ export const sdlcPanel = ({ els, C, sdlc, W, surface }: SdlcProps) => {
       </Text>
     )
   }
+  // Intents are the changes: those being worked on, then the finished ones. The backlog is what is still to come.
+  const intents = [...sdlc.checklist.filter(i => i.state === 'working'), ...sdlc.checklist.filter(i => i.state === 'done')]
+  const backlog = sdlc.checklist.filter(i => i.state === 'pending')
+  const section = (title: string, rows: ReturnType<typeof item>[]) => [
+    <Box key={`${title}-gap`}>
+      <Text> </Text>
+    </Box>,
+    <Box key={`section-${title}`} flexDirection="column">
+      <Box key={`${title}-head`} columnGap={1}>
+        <Text color={C.white}>{title}</Text>
+        {/* a line runs on from the title across the rest of the row: inner width less the border, padding, title and gap */}
+        {rule({ els, color: C.border, hex: '#87ceeb', cells: W - 4 - title.length - 1, surface })}
+      </Box>
+      {rows}
+    </Box>,
+  ]
   const active = sdlc.activeId
   return (
     <Box key="sdlc-box" flexDirection="column" borderStyle="round" borderColor={C.border} paddingX={1} width={widthOf(surface, W)}>
@@ -266,27 +282,8 @@ export const sdlcPanel = ({ els, C, sdlc, W, surface }: SdlcProps) => {
       ) : (
         <Text color={C.dim}>no active change</Text>
       )}
-      {sdlc.checklist.length > 0 || !sdlc.isPendingKnown ? (
-        <Box key="checklist-gap">
-          <Text> </Text>
-        </Box>
-      ) : null}
-      {sdlc.checklist.length > 0 || !sdlc.isPendingKnown ? (
-        <Box key="checklist" flexDirection="column">
-          <Box key="checklist-head" columnGap={1}>
-            <Text color={C.white}>Tasks</Text>
-            {/* a line runs on from the title across the rest of the row: inner width less the border, padding, title and gap */}
-            {rule({ els, color: C.border, hex: '#87ceeb', cells: W - 4 - 'Tasks'.length - 1, surface })}
-          </Box>
-          {sdlc.checklist
-            .filter(i => i.state === 'working')
-            .map(i => item(i))}
-          {sdlc.isPendingKnown ? sdlc.checklist.filter(i => i.state === 'pending').map(i => item(i)) : <Text color={C.dim}>{`pending ${NA}`}</Text>}
-          {sdlc.checklist
-            .filter(i => i.state === 'done')
-            .map(i => item(i))}
-        </Box>
-      ) : null}
+      {intents.length > 0 ? section('Intents', intents.map(i => item(i))) : null}
+      {backlog.length > 0 ? section('Backlog', backlog.map(i => item(i))) : null}
     </Box>
   )
 }
