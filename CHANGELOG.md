@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 (2026-10-20)
+
+- **Fix:** a backlog written as `## <ID>. <Title>` pitches, with no `## Order` table, now shows in the Backlog list. The table still
+  wins when there is one.
+
 ## 0.1.5 (2026-10-20)
 
 - **Change:** the AI-SDLC card's Tasks list is now two lists: Intents (the changes being worked on, then the finished ones) and

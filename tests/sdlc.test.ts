@@ -101,6 +101,15 @@ test('the backlog order is the table under ## Order; no such heading gives nothi
   expect(parseBacklogOrder('# Backlog\n\nno table here')).toEqual([])
 })
 
+test('a backlog with no Order table is its pitch headings, ## <ID>. <Title>, in the order written', () => {
+  const pitches = '# Backlog\n\n## How an item runs\ntext\n\n## 2. Waves and halo growth\n**Problem.** x\n\n## L3. `Pickups` and explosions\n'
+  expect(parseBacklogOrder(pitches)).toEqual([
+    { id: '2', title: 'Waves and halo growth' },
+    { id: 'L3', title: 'Pickups and explosions' },
+  ])
+  expect(parseBacklogOrder(`${BACKLOG}\n## 9. Ignored while a table exists\n`).map(r => r.id)).toEqual(['D1', 'L2'])
+})
+
 test('text read from the repo never carries control characters on to the terminal', () => {
   const esc = '\u001b[31m'
   const hasControl = (s: string) => /[\u0000-\u001f\u007f-\u009f]/.test(s)

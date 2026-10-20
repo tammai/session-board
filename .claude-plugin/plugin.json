@@ -1,6 +1,6 @@
 {
   "name": "session-board",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A live board for Claude Code: model, context, limits and cost, AI-SDLC progress read from your repo, subagent cards and every permission check. Read-only; unreadable values show N/A.",
   "author": { "name": "Tam Mai", "url": "https://github.com/tammai" },
   "homepage": "https://github.com/tammai/session-board",

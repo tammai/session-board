@@ -130,8 +130,7 @@ export const checklistOf = (changes: ChangeSummary[], backlog: { id: string; tit
 }
 
 /** The rows of the table under the `## Order` heading, in order. */
-export const parseBacklogOrder = (markdown: string): { id: string; title: string }[] => {
-  const lines = markdown.split(/\r?\n/)
+const parseOrderTable = (lines: string[]): { id: string; title: string }[] => {
   const start = lines.findIndex(l => /^##\s+Order\s*$/.test(l))
   if (start < 0) return []
   const rows: { id: string; title: string }[] = []
@@ -148,4 +147,20 @@ export const parseBacklogOrder = (markdown: string): { id: string; title: string
     rows.push({ id: clean(id), title: clean(title.replace(/`/g, '')) })
   }
   return rows
+}
+
+const parsePitchHeadings = (lines: string[]): { id: string; title: string }[] =>
+  lines.flatMap(line => {
+    const m = /^##\s+([A-Za-z0-9_-]+)\.\s+(\S.*)$/.exec(line)
+    return m?.[1] !== undefined && m[2] !== undefined ? [{ id: clean(m[1]), title: clean(m[2].replace(/`/g, '')).trim() }] : []
+  })
+
+/**
+ * The backlog's items in order: the rows of the table under the `## Order` heading, or, when there is none, the
+ * `## <ID>. <Title>` headings of its pitches (ai-sdlc's backlog-item template), in the order they are written.
+ */
+export const parseBacklogOrder = (markdown: string): { id: string; title: string }[] => {
+  const lines = markdown.split(/\r?\n/)
+  const table = parseOrderTable(lines)
+  return table.length > 0 ? table : parsePitchHeadings(lines)
 }
