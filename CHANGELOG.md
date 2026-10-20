@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 (2026-10-20)
+
+- **Fix:** a leftover `verify.md` no longer ticks build and verify while an earlier step (spec, plan) is still in progress.
+- The AI-SDLC section no longer shows the `last verify` line or `implementer N/A`; an implementer line appears only when one is recorded.
+
 ## 0.1.0 (2026-10-20)
 
 First release: a fork of claude-flightdeck 0.4.0 (commit 6150b9f).
