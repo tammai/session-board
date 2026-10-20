@@ -4,24 +4,18 @@ import {
   EMPTY_LEDGER,
   NA,
   applySession,
-  cellsOf,
   money,
   normalizeLedger,
   normalizeProject,
   pctText,
   projectKey,
   projectTotal,
-  shortBranch,
   toneOf,
   untilReset,
 } from '../hooks/statusline'
 
-test('gauges: green to 50, orange above, red from 80; five cells rounded to nearest; bad numbers clamp', () => {
+test('limits: green to 50, orange above, red from 80; percents round and bad numbers clamp', () => {
   expect([50, 51, 79, 80].map(toneOf)).toEqual(['green', 'orange', 'orange', 'red'])
-  expect(cellsOf(0)).toEqual({ on: 0, off: 5 })
-  expect(cellsOf(50)).toEqual({ on: 3, off: 2 })
-  expect(cellsOf(100)).toEqual({ on: 5, off: 0 })
-  expect([cellsOf(Number.NaN), cellsOf(-5), cellsOf(140)]).toEqual([{ on: 0, off: 5 }, { on: 0, off: 5 }, { on: 5, off: 0 }])
   expect([pctText(Number.NaN), pctText(null), pctText(42.4), pctText(140)]).toEqual([NA, NA, '42%', '100%'])
 })
 
@@ -36,10 +30,8 @@ test('a reset reads as the time left, now once it has passed, N/A when unknown',
   expect([untilReset(null, now), untilReset(undefined, now), untilReset(Number.NaN, now)]).toEqual([NA, NA, NA])
 })
 
-test('money and branch text: two decimals, N/A when unknown, a long branch cut with an ellipsis', () => {
+test('money: two decimals, N/A when unknown', () => {
   expect([money(1.234), money(0), money(null), money(Number.NaN)]).toEqual(['$1.23', '$0.00', NA, NA])
-  expect(shortBranch('feature/a-very-long-branch-name-here')).toBe('feature/a-very-long-bra…')
-  expect(shortBranch('main')).toBe('main')
 })
 
 test('the project key is the one statusline.sh uses: forward slashes, no trailing slash, SHA-1[:16]', async () => {

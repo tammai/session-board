@@ -1,8 +1,8 @@
 {
   "name": "session-board",
-  "metadata": { "description": "session-board: a live Claude Code board with model, limits and cost, and AI-SDLC progress." },
+  "metadata": { "description": "session-board: a band above the Claude Code prompt with model, limits and spend, and AI-SDLC progress." },
   "owner": { "name": "Tam Mai", "url": "https://github.com/tammai" },
   "plugins": [
-    { "name": "session-board", "source": "./", "description": "Model, limits and cost, AI-SDLC progress, subagent cards and permission checks, read-only." }
+    { "name": "session-board", "source": "./", "description": "Model, limits and spend, and AI-SDLC progress above the prompt, read-only." }
   ]
 }

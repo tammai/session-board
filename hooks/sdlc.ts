@@ -1,15 +1,12 @@
-// Pure ai-sdlc logic: front matter, stage rules, build rows, metrics, backlog order. The stage order is
+// Pure ai-sdlc logic: front matter, stage rules, build rows. The stage order is
 // ported from ai-sdlc's `chainStatus` (plugin/scripts/lib.mjs), so the board agrees with `sdlc status`.
-import type { BuildRow, ChangeSummary, ChecklistItem, Stage, StageState } from '../types'
+import type { BuildRow, Stage, StageState } from '../types'
 import { clean } from './core'
 
 export type Meta = Record<string, string>
 
 /** A change's documents by kind: its front matter, or absent when the file is missing. */
 export type ChangeDocs = Partial<Record<'intent' | 'design' | 'ui' | 'spec' | 'plan' | 'verify' | 'review', Meta>>
-
-/** The build loop's cap on implement/verify rounds per step (ai-sdlc's `MAX_ROUNDS`). */
-export const MAX_ROUNDS = 3
 
 /** The `key: value` lines between the `---` fences, or null when the text has no front matter. */
 export const parseFrontMatter = (text: string): Meta | null => {
@@ -23,7 +20,9 @@ export const parseFrontMatter = (text: string): Meta | null => {
   return meta
 }
 
-const ORDER: Stage[] = ['intent', 'spec', 'plan', 'build', 'verify', 'review', 'ship', 'knowledge']
+/** The pipeline's eight steps, in order, and what each is called. */
+export const STAGES: Stage[] = ['intent', 'spec', 'plan', 'build', 'verify', 'review', 'ship', 'knowledge']
+export const LABELS: Record<Stage, string> = { intent: 'Intent', spec: 'Spec', plan: 'Plan', build: 'Build', verify: 'Verify', review: 'Review', ship: 'Ship', knowledge: 'Knowledge' }
 
 /**
  * Where a change stands: its tier, the next step (as `sdlc status` names it) and each stage's state.
@@ -61,7 +60,7 @@ export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false, isBuildOpen
   }
   const stages = {} as Record<Stage, StageState>
   let hasCurrent = false
-  for (const s of ORDER) {
+  for (const s of STAGES) {
     if ((s === 'spec' || s === 'review') && tier === 'S') stages[s] = 'skipped'
     // build and verify are read from verify.md: a stale one must not tick them while an earlier step is still in progress
     else if (isDone[s] && !((s === 'build' || s === 'verify') && hasCurrent && !outcome)) stages[s] = 'done'
@@ -75,14 +74,14 @@ export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false, isBuildOpen
 
 /** Whether the line after each stage (the one joining it to the next) is lit: up to the furthest stage reached. */
 export const stageLinks = (stages: Record<Stage, StageState>): boolean[] => {
-  const reached = Math.max(-1, ...ORDER.map((s, i) => (stages[s] === 'done' || stages[s] === 'current' ? i : -1)))
-  return ORDER.slice(0, -1).map((_, i) => i + 1 <= reached)
+  const reached = Math.max(-1, ...STAGES.map((s, i) => (stages[s] === 'done' || stages[s] === 'current' ? i : -1)))
+  return STAGES.slice(0, -1).map((_, i) => i + 1 <= reached)
 }
 
 /** The step now (the one in progress) and the step next (the one after it, a skipped step never next). */
 export const nowNext = (stages: Record<Stage, StageState>): { now: Stage | null; next: Stage | null } => {
-  const now = ORDER.find(s => stages[s] === 'current') ?? null
-  const next = now ? (ORDER.slice(ORDER.indexOf(now) + 1).find(s => stages[s] !== 'skipped') ?? null) : null
+  const now = STAGES.find(s => stages[s] === 'current') ?? null
+  const next = now ? (STAGES.slice(STAGES.indexOf(now) + 1).find(s => stages[s] !== 'skipped') ?? null) : null
   return { now, next }
 }
 
@@ -101,66 +100,4 @@ export const buildRows = (steps: unknown): BuildRow[] => {
     })
   }
   return rows
-}
-
-/** The most items the checklist holds, and the most of them the backlog may take. */
-export const CHECKLIST_CAP = 10
-const PENDING_CAP = 4
-
-/**
- * One checklist: the changes being worked on first (the active one on top), the backlog next, and finished changes
- * last, the newest closed first. The whole list is at most `cap`; the backlog shows at most 4 so some finished
- * changes always fit.
- */
-export const checklistOf = (changes: ChangeSummary[], backlog: { id: string; title: string }[] | null, activeId: string | null, cap = CHECKLIST_CAP): ChecklistItem[] => {
-  const working = changes
-    .filter(c => !c.outcome)
-    .sort((a, b) => (a.id === activeId ? -1 : b.id === activeId ? 1 : b.id.localeCompare(a.id)))
-    .slice(0, cap)
-    .map((c): ChecklistItem => ({ id: c.id, state: 'working', note: c.next }))
-  const pending = (backlog ?? [])
-    .slice(0, Math.min(PENDING_CAP, cap - working.length))
-    .map((b): ChecklistItem => ({ id: b.id, state: 'pending', note: b.title }))
-  const done = changes
-    .filter(c => c.outcome)
-    .sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? '') || b.id.localeCompare(a.id))
-    .slice(0, cap - working.length - pending.length)
-    .map((c): ChecklistItem => ({ id: c.id, state: 'done', note: null }))
-  return [...working, ...pending, ...done]
-}
-
-/** The rows of the table under the `## Order` heading, in order. */
-const parseOrderTable = (lines: string[]): { id: string; title: string }[] => {
-  const start = lines.findIndex(l => /^##\s+Order\s*$/.test(l))
-  if (start < 0) return []
-  const rows: { id: string; title: string }[] = []
-  for (const line of lines.slice(start + 1)) {
-    if (/^#{1,6}\s/.test(line)) break
-    if (!line.startsWith('|')) {
-      if (rows.length > 0) break
-      continue
-    }
-    const cells = line.split('|').map(c => c.trim())
-    const id = cells[1]
-    const title = cells[2]
-    if (!id || !title || /^-+$/.test(id) || id === 'ID') continue
-    rows.push({ id: clean(id), title: clean(title.replace(/`/g, '')) })
-  }
-  return rows
-}
-
-const parsePitchHeadings = (lines: string[]): { id: string; title: string }[] =>
-  lines.flatMap(line => {
-    const m = /^##\s+([A-Za-z0-9_-]+)\.\s+(\S.*)$/.exec(line)
-    return m?.[1] !== undefined && m[2] !== undefined ? [{ id: clean(m[1]), title: clean(m[2].replace(/`/g, '')).trim() }] : []
-  })
-
-/**
- * The backlog's items in order: the rows of the table under the `## Order` heading, or, when there is none, the
- * `## <ID>. <Title>` headings of its pitches (ai-sdlc's backlog-item template), in the order they are written.
- */
-export const parseBacklogOrder = (markdown: string): { id: string; title: string }[] => {
-  const lines = markdown.split(/\r?\n/)
-  const table = parseOrderTable(lines)
-  return table.length > 0 ? table : parsePitchHeadings(lines)
 }

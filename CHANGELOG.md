@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 (2026-10-20)
+
+- **Change:** only the band above the prompt is left. The pane, the Main, AI-SDLC, Agents and Gate panels, the two-column and
+  swimlane layouts and the animated rail are gone, with `/session-board compact` and `reset` and the `panels`, `layout`,
+  `maxCards` and `motion` options. `/session-board [open|close]` shows or hides the band; the board no longer reads git, tracks
+  subagents or permission checks, or counts compactions.
+- **Change:** on the desktop app the band is one line of AI-SDLC, with no border of its own and the host's close control (`×`):
+  `AI-SDLC · Build · Tier M · <change>` (the step now in orange), then the small unlabelled pipeline as one SVG drawing and the build's count (`8/9`, the passed number
+  in green), all in one size of type. A project with no ai-sdlc files has no band there. The editor and the phones get a two-row
+  card. The terminal band is unchanged.
+- **Change:** the band's second line is `AI-SDLC <marks>  now Build · next Verify · done 8/9 · <change> · tier M`: the step now in
+  orange, the step next and the tier in sky blue, the done count in green (not shown for a build of one step). It reads only the
+  active change; the backlog and the other changes are not read.
+
 ## 0.1.6 (2026-10-20)
 
 - **Fix:** a backlog written as `## <ID>. <Title>` pitches, with no `## Order` table, now shows in the Backlog list. The table still

@@ -69,17 +69,3 @@ tier: M
 ---
 # Review`,
 }
-
-export const BACKLOG = `# Backlog
-
-## How an item runs
-- Not a table.
-
-## Order
-| ID | Title | Appetite | Depends on |
-|---|---|---|---|
-| D1 | Worktree support | L, about 11 h | — |
-| L2 | \`session-board\`, remade separately | L | — |
-
-Release notes follow here.
-`

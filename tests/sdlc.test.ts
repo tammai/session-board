@@ -2,9 +2,9 @@ import { expect, test } from 'claude-code/testing'
 
 import { shorten } from '../hooks/core'
 import type { Stage, StageState } from '../types'
-import { buildRows, checklistOf, nowNext, parseBacklogOrder, parseFrontMatter, stageLinks, stageOf } from '../hooks/sdlc'
+import { buildRows, nowNext, parseFrontMatter, stageLinks, stageOf } from '../hooks/sdlc'
 import type { ChangeDocs } from '../hooks/sdlc'
-import { BACKLOG, TIER_M, TIER_S } from './fixtures/sdlc'
+import { TIER_M, TIER_S } from './fixtures/sdlc'
 
 const docsOf = (raw: Record<string, string>): ChangeDocs => {
   const out: ChangeDocs = {}
@@ -56,65 +56,10 @@ test('build rows come from the steps map and tolerate any other shape', () => {
   expect([buildRows(undefined), buildRows('x'), buildRows(7), buildRows({ a: 'b' })]).toEqual([[], [], [], []])
 })
 
-const change = (id: string, outcome: string | null, closedAt: string | null = null) => ({
-  id,
-  next: outcome ? `closed (${outcome})` : 'review',
-  outcome,
-  closedAt,
-})
-
-test('the checklist has what is being worked on first, the backlog next, and finished changes last, newest closed first', () => {
-  const changes = [
-    change('a-open', null),
-    change('b-active', null),
-    change('d1', 'shipped', '2026-10-01T00:00:00Z'),
-    change('d2', 'shipped', '2026-10-03T00:00:00Z'),
-    change('d3', 'shipped'), // closed, but with no date: after the dated ones
-  ]
-  const backlog = [
-    { id: 'D1', title: 'First' },
-    { id: 'D2', title: 'Second' },
-  ]
-  const list = checklistOf(changes, backlog, 'b-active')
-  expect(list.map(i => `${i.state}:${i.id}`)).toEqual(['working:b-active', 'working:a-open', 'pending:D1', 'pending:D2', 'done:d2', 'done:d1', 'done:d3'])
-  expect(list[0]?.note).toBe('review') // a working change carries its next step
-  expect(list[2]?.note).toBe('First') // a pending one its title
-  expect(checklistOf(changes, null, null).some(i => i.state === 'pending')).toBe(false) // no backlog to read: none pending
-})
-
-test('the checklist holds at most 10: the backlog shows 4 at most and the finished changes fill the rest', () => {
-  const closed = Array.from({ length: 8 }, (_, i) => change(`c${i}`, 'shipped', `2026-10-0${i + 1}T00:00:00Z`))
-  const backlog = Array.from({ length: 6 }, (_, i) => ({ id: `B${i}`, title: `Item ${i}` }))
-  const list = checklistOf([change('open', null), ...closed], backlog, 'open')
-  expect(list).toHaveLength(10)
-  expect(list.map(i => i.state)).toEqual(['working', 'pending', 'pending', 'pending', 'pending', 'done', 'done', 'done', 'done', 'done'])
-  expect(list.at(-1)?.id).toBe('c3') // the five newest closed: c7 .. c3
-  const crowded = Array.from({ length: 12 }, (_, i) => change(`w${i}`, null))
-  expect(checklistOf(crowded, backlog, null)).toHaveLength(10)
-})
-
-test('the backlog order is the table under ## Order; no such heading gives nothing', () => {
-  expect(parseBacklogOrder(BACKLOG)).toEqual([
-    { id: 'D1', title: 'Worktree support' },
-    { id: 'L2', title: 'session-board, remade separately' },
-  ])
-  expect(parseBacklogOrder('# Backlog\n\nno table here')).toEqual([])
-})
-
-test('a backlog with no Order table is its pitch headings, ## <ID>. <Title>, in the order written', () => {
-  const pitches = '# Backlog\n\n## How an item runs\ntext\n\n## 2. Waves and halo growth\n**Problem.** x\n\n## L3. `Pickups` and explosions\n'
-  expect(parseBacklogOrder(pitches)).toEqual([
-    { id: '2', title: 'Waves and halo growth' },
-    { id: 'L3', title: 'Pickups and explosions' },
-  ])
-  expect(parseBacklogOrder(`${BACKLOG}\n## 9. Ignored while a table exists\n`).map(r => r.id)).toEqual(['D1', 'L2'])
-})
-
 test('text read from the repo never carries control characters on to the terminal', () => {
   const esc = '\u001b[31m'
   const hasControl = (s: string) => /[\u0000-\u001f\u007f-\u009f]/.test(s)
   expect(hasControl(parseFrontMatter(`---\ntier: ${esc}L\u0007\n---\n`)?.tier ?? '')).toBe(false)
-  expect(parseBacklogOrder(`## Order\n| ID | Title |\n|---|---|\n| D1 | ${esc}Evil\u001b]0;x\u0007 |\n`).every(r => !hasControl(r.title))).toBe(true)
   expect(buildRows({ [`sp${esc}ec`]: { rounds: 1, model: `${esc}opus`, verdict: `${esc}pass` } }).every(r => !hasControl(r.step + r.model + (r.verdict ?? '')))).toBe(true)
   expect(hasControl(shorten(`a${esc}b\u0007c`, 20))).toBe(false)
 })

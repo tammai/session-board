@@ -11,12 +11,6 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 /** Calm to 50, orange past it, red from 80. */
 export const toneOf = (pct: number): Tone => (pct >= 80 ? 'red' : pct > 50 ? 'orange' : 'green')
 
-/** A gauge of `cells`, one cell per 100/cells points, rounded to nearest; out-of-range values clamp. */
-export const cellsOf = (pct: number, cells = 5): { on: number; off: number } => {
-  const on = isNum(pct) ? Math.floor((clampPct(pct) * cells + 50) / 100) : 0
-  return { on, off: cells - on }
-}
-
 export const pctText = (pct: number | null | undefined) => (isNum(pct) ? `${clampPct(pct)}%` : NA)
 
 /** Time left until a reset: `43m`, `2h14m`, `4d3h`; `now` once it has passed; N/A when unknown. */
@@ -32,9 +26,6 @@ export const untilReset = (resetsAtMs: number | null | undefined, nowMs: number)
 }
 
 export const money = (n: number | null | undefined) => (isNum(n) && n >= 0 ? `$${n.toFixed(2)}` : NA)
-
-/** A long branch name is cut to `max` characters, ending in an ellipsis; the start identifies it. */
-export const shortBranch = (branch: string, max = 24) => (branch.length > max ? `${branch.slice(0, max - 1)}…` : branch)
 
 /** The project path as the ledger hashes it: forward slashes, no trailing slash. */
 export const normalizeProject = (path: string) => path.replace(/\\/g, '/').replace(/\/+$/, '')
