@@ -63,7 +63,8 @@ export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false): { tier: st
   let hasCurrent = false
   for (const s of ORDER) {
     if ((s === 'spec' || s === 'review') && tier === 'S') stages[s] = 'skipped'
-    else if (isDone[s]) stages[s] = 'done'
+    // build and verify are read from verify.md: a stale one must not tick them while an earlier step is still in progress
+    else if (isDone[s] && !((s === 'build' || s === 'verify') && hasCurrent && !outcome)) stages[s] = 'done'
     else if (!hasCurrent && !outcome) {
       stages[s] = 'current'
       hasCurrent = true

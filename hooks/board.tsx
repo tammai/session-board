@@ -218,9 +218,6 @@ const stepper = ({ els, C, stages, W, surface }: StepperProps) => {
   )
 }
 
-/** `2026-10-19T13:58:20Z` as `2026-10-19 13:58`; anything else is unknown. */
-const whenOf = (iso: string | null) => (iso && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? iso.slice(0, 16).replace('T', ' ') : NA)
-
 /** The AI-SDLC card: the active change's stepper and build rounds, the metrics, recent changes and the backlog. */
 export const sdlcPanel = ({ els, C, sdlc, W, surface }: SdlcProps) => {
   const { Box, Text } = els
@@ -260,14 +257,9 @@ export const sdlcPanel = ({ els, C, sdlc, W, surface }: SdlcProps) => {
           {sdlc.build?.map(r => (
             <Text key={`build-${r.step}`} wrap="truncate">{`${r.step} ${r.rounds}/${sdlc.maxRounds} ${r.verdict ?? '–'} ${r.model || '–'}`}</Text>
           ))}
-          <Text color={C.dim}>{`last verify ${whenOf(sdlc.lastVerifyAt)}`}</Text>
-          {sdlc.implementers && sdlc.implementers.length > 0 ? (
-            sdlc.implementers.map(i => (
-              <Text key={`impl-${i.agent}-${i.model}`} color={C.dim} wrap="truncate">{`implementer ${i.agent} (${i.model})`}</Text>
-            ))
-          ) : (
-            <Text color={C.dim}>{`implementer ${NA}`}</Text>
-          )}
+          {sdlc.implementers?.map(i => (
+            <Text key={`impl-${i.agent}-${i.model}`} color={C.dim} wrap="truncate">{`implementer ${i.agent} (${i.model})`}</Text>
+          ))}
           </Box>
         </Box>
       ) : (

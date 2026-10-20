@@ -123,6 +123,11 @@ test('the eight steps of the pipeline: build ends where verify.md begins, and kn
   expect(stageOf(shipped, true).stages).toMatchObject({ ship: 'done', knowledge: 'done' })
 })
 
+test('a stale verify.md does not tick build and verify while the plan is still open', () => {
+  const docs = { intent: { artifact: 'intent', status: 'approved', tier: 'M' }, spec: { artifact: 'spec', status: 'approved' }, plan: { artifact: 'plan', status: 'draft' }, verify: { artifact: 'verify', status: 'passed' } }
+  expect(stageOf(docs).stages).toMatchObject({ plan: 'current', build: 'todo', verify: 'todo' })
+})
+
 test('the lines between steps are lit up to the current one, grey after it', () => {
   const steps = (...s: StageState[]) => ({ intent: s[0], spec: s[1], plan: s[2], build: s[3], verify: s[4], review: s[5], ship: s[6], knowledge: s[7] }) as Record<Stage, StageState>
   // Intent, Spec skipped, Plan, Build now: the first three lines are lit, the four after Build are not

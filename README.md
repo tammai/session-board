@@ -39,7 +39,7 @@ The gauges are drawn as in a status line: five block cells, green to 50%, orange
 - an eight-step progress line (Intent, Spec, Plan, Build, Verify, Review, Ship, Knowledge) with marks joined by lines, lit
   up to the current step; narrow boards name only the current step and show the others by their first letter; the desktop
   app draws it as an SVG;
-- the step now and the step next, unverified edits, build rounds against the cap, the last verify and the implementer;
+- the step now and the step next, unverified edits, build rounds against the cap and the implementer;
 - **Tasks**, one list of at most 10: `[>]` the changes being worked on, `[ ]` the next backlog items (up to 4), `[x]` finished
   changes, newest closed first.
 

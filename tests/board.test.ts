@@ -274,7 +274,6 @@ test('the AI-SDLC section shows the stepper, build rounds and one checklist: wor
     expect((await ui.find({ text: /^now Review · next Ship$/ }))?.props.color).toBe('text')
     await has(/^unverified edits$/)
     await has(/^spec 2\/3 fail sonnet$/)
-    await has(/^last verify 2026-10-19 13:58$/)
     await has(/^implementer ai-sdlc:implementer \(sonnet\)$/)
     // one list: what is being worked on first, the backlog next, finished changes last
     // an empty row sits above the list, which is titled "Tasks"
