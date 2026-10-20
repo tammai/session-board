@@ -68,7 +68,7 @@ test('the sdlc section is read from the repo files; a project without them gives
       dirty: true,
       lastVerify: '2026-10-19T13:58:20Z',
       implementers: { [OPEN]: [{ agent: 'ai-sdlc:implementer', model: 'sonnet' }] },
-      build: { [OPEN]: { steps: { spec: { rounds: 2, model: 'sonnet', verdict: 'fail' } } } },
+      build: { [OPEN]: { steps: { spec: { rounds: 2, model: 'sonnet', verdict: 'pass' } } } },
     }),
     '/p/docs/project/backlog.md': BACKLOG,
   }
@@ -80,7 +80,7 @@ test('the sdlc section is read from the repo files; a project without them gives
   expect(sdlc?.stages?.review).toBe('current')
   expect(sdlc?.isDirty).toBe(true)
   expect(sdlc?.lastVerifyAt).toBe('2026-10-19T13:58:20Z')
-  expect(sdlc?.build).toEqual([{ step: 'spec', rounds: 2, model: 'sonnet', verdict: 'fail' }])
+  expect(sdlc?.build).toEqual([{ step: 'spec', rounds: 2, model: 'sonnet', verdict: 'pass' }])
   expect(sdlc?.implementers).toEqual([{ agent: 'ai-sdlc:implementer', model: 'sonnet' }])
   // working first, the backlog next, finished last
   expect(sdlc?.checklist.map(i => `${i.state}:${i.id}`)).toEqual([`working:${OPEN}`, 'pending:D1', 'pending:L2', `done:${SHIPPED}`])

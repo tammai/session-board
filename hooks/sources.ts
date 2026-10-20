@@ -207,15 +207,16 @@ export const readSdlc = async (io: Io, root: string, cache: Record<string, Chang
     changes.push(summaryOf(id, intent, stageOf(docs).next))
   }
 
+  const steps = active ? (state?.build as Record<string, { steps?: unknown }> | undefined)?.[active]?.steps : undefined
+  const build = active && state ? buildRows(steps) : null
   let activeView: Pick<Sdlc, 'tier' | 'stages' | 'next'> = { tier: null, stages: null, next: null }
   if (active) {
     const docs = await readDocs(io, `${base}/${active}`)
     // The knowledge step is done once knowledges/log.md has a line for this change.
     const log = await safe(() => io.read(`${r}/knowledges/log.md`))
-    if (docs.intent) activeView = stageOf(docs, log !== null && log.includes(active))
+    if (docs.intent) activeView = stageOf(docs, log !== null && log.includes(active), build?.some(b => b.verdict !== 'pass') === true)
   }
 
-  const steps = active ? (state?.build as Record<string, { steps?: unknown }> | undefined)?.[active]?.steps : undefined
   const implementersRaw = active ? (state?.implementers as Record<string, unknown> | undefined)?.[active] : undefined
   const implementers = Array.isArray(implementersRaw)
     ? implementersRaw
@@ -232,7 +233,7 @@ export const readSdlc = async (io: Io, root: string, cache: Record<string, Chang
       ...activeView,
       isDirty: typeof state?.dirty === 'boolean' ? state.dirty : null,
       lastVerifyAt: typeof state?.lastVerify === 'string' ? state.lastVerify : null,
-      build: active && state ? buildRows(steps) : null,
+      build,
       implementers,
       maxRounds: MAX_ROUNDS,
       checklist: checklistOf(changes, backlog, active),

@@ -24,7 +24,7 @@ const project = (): Record<string, string> => ({
     dirty: true,
     lastVerify: '2026-10-19T13:58:20Z',
     implementers: { [ID]: [{ agent: 'ai-sdlc:implementer', model: 'sonnet' }] },
-    build: { [ID]: { steps: { spec: { rounds: 2, model: 'sonnet', verdict: 'fail' } } } },
+    build: { [ID]: { steps: { spec: { rounds: 2, model: 'sonnet', verdict: 'pass' } } } },
   }),
   ...Object.fromEntries(Object.entries(TIER_S).map(([k, v]) => [`${ROOT}/docs/sdlc/${SHIPPED}/${k}.md`, v])),
   [`${ROOT}/docs/project/backlog.md`]: BACKLOG,
@@ -273,7 +273,7 @@ test('the AI-SDLC section shows the stepper, build rounds and one checklist: wor
     await has(/^now Review · next Ship$/)
     expect((await ui.find({ text: /^now Review · next Ship$/ }))?.props.color).toBe('text')
     await has(/^unverified edits$/)
-    await has(/^spec 2\/3 fail sonnet$/)
+    await has(/^spec 2\/3 pass sonnet$/)
     await has(/^implementer ai-sdlc:implementer \(sonnet\)$/)
     // one list: what is being worked on first, the backlog next, finished changes last
     // an empty row sits above the list, which is titled "Tasks"

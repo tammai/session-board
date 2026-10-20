@@ -29,7 +29,7 @@ const ORDER: Stage[] = ['intent', 'spec', 'plan', 'build', 'verify', 'review', '
  * Where a change stands: its tier, the next step (as `sdlc status` names it) and each stage's state.
  * Tier S has no spec or review; a design (tier L, or one that exists) and a ui doc are part of the spec stage.
  */
-export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false): { tier: string; next: string; stages: Record<Stage, StageState> } => {
+export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false, isBuildOpen = false): { tier: string; next: string; stages: Record<Stage, StageState> } => {
   const tier = docs.intent?.tier || 'M'
   const st = (k: keyof ChangeDocs) => (docs[k] ? docs[k]?.status || 'draft' : 'missing')
   const outcome = docs.intent?.outcome || ''
@@ -42,7 +42,7 @@ export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false): { tier: st
   else if (docs.ui && st('ui') !== 'approved') next = 'ui'
   else if (tier !== 'S' && st('spec') !== 'approved') next = 'spec'
   else if (st('plan') !== 'approved') next = 'plan'
-  else if (st('verify') !== 'passed') next = 'build'
+  else if (st('verify') !== 'passed' || isBuildOpen) next = 'build'
   else if (tier !== 'S' && st('review') !== 'approved') next = 'review'
   else next = 'ship'
   if (outcome && next === 'ship') next = `closed (${outcome})`
@@ -52,8 +52,8 @@ export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false): { tier: st
     spec: st('spec') === 'approved' && (!needsDesign || st('design') === 'approved') && (!docs.ui || st('ui') === 'approved'),
     plan: st('plan') === 'approved',
     // building ends where verify.md begins; verifying ends when it passes
-    build: st('verify') !== 'missing',
-    verify: st('verify') === 'passed',
+    build: st('verify') !== 'missing' && !isBuildOpen,
+    verify: st('verify') === 'passed' && !isBuildOpen,
     review: st('review') === 'approved',
     ship: outcome === 'shipped',
     // the knowledge step leaves a line for the change in knowledges/log.md

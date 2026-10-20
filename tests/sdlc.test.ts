@@ -128,6 +128,13 @@ test('a stale verify.md does not tick build and verify while the plan is still o
   expect(stageOf(docs).stages).toMatchObject({ plan: 'current', build: 'todo', verify: 'todo' })
 })
 
+test('a passed verify.md from an earlier group does not end the build while a step has no pass', () => {
+  const docs = { intent: { artifact: 'intent', status: 'approved', tier: 'M' }, spec: { artifact: 'spec', status: 'approved' }, plan: { artifact: 'plan', status: 'approved' }, verify: { artifact: 'verify', status: 'passed' } }
+  const r = stageOf(docs, false, true)
+  expect(r.stages).toMatchObject({ plan: 'done', build: 'current', verify: 'todo', review: 'todo' })
+  expect(r.next).toBe('build')
+})
+
 test('the lines between steps are lit up to the current one, grey after it', () => {
   const steps = (...s: StageState[]) => ({ intent: s[0], spec: s[1], plan: s[2], build: s[3], verify: s[4], review: s[5], ship: s[6], knowledge: s[7] }) as Record<Stage, StageState>
   // Intent, Spec skipped, Plan, Build now: the first three lines are lit, the four after Build are not

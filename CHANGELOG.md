@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 (2026-10-20)
+
+- **Fix:** the progress line stays on Build while a build step has no pass. A `verify.md` left by an earlier group no longer moves
+  the change to Review mid-build.
+
 ## 0.1.2 (2026-10-20)
 
 - **Fix:** the board no longer goes blank when an agent is resumed. A resumed agent spawned a second card under the same id, the
