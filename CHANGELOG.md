@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (2026-10-20)
+
+- **Fix:** a finished change in the Tasks list is cut at the edge of the row, not 20 columns short of it. Working and pending rows are unchanged.
+
 ## 0.1.3 (2026-10-20)
 
 - **Fix:** the progress line stays on Build while a build step has no pass. A `verify.md` left by an earlier group no longer moves

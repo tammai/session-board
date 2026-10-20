@@ -368,6 +368,7 @@ test('on the terminal long names are cut at a character count; on desktop the ho
     const git = await rowOf(ui, 'main-git')
     if (surface === 'terminal') {
       expect(list).toContain('…') // the id is cut to fit the columns
+      expect(list).toContain(`[x] ${SHIPPED.slice(0, 55)}…`) // a done row has no note after it: its id gets the whole row, 4 for the border and padding, 4 for the mark
       expect(git).toContain('…')
     } else {
       // a proportional font fits more than the column count says: the whole text goes to the host, which truncates it

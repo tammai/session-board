@@ -224,7 +224,8 @@ export const sdlcPanel = ({ els, C, sdlc, W, surface }: SdlcProps) => {
   // [>] being worked on, [ ] still to come, [x] finished
   const item = (i: ChecklistItem) => {
     const mark = i.state === 'working' ? '[>]' : i.state === 'pending' ? '[ ]' : '[x]'
-    const id = fit(i.id, Math.max(16, W - 24), surface)
+    // a done row has no note after its id: the id gets the whole row, less the border, padding and mark
+    const id = fit(i.id, i.state === 'done' ? W - 8 : Math.max(16, W - 24), surface)
     const text = i.state === 'working' ? `${mark} ${id} · ${i.note ?? NA}` : i.state === 'pending' ? `${mark} ${id} ${fit(i.note ?? '', Math.max(8, W - 12 - id.length), surface)}` : `${mark} ${id}`
     return (
       <Text key={`check-${i.state}-${i.id}`} wrap="truncate" color={i.state === 'working' ? C.folder : undefined} dimColor={i.state === 'done'}>
