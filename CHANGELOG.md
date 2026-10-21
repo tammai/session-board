@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 (2026-10-21)
+
+- **Change:** where the AI-SDLC line cannot be drawn the band says why instead of hiding: no `.sdlc` folder, a folder with no band
+  file, a file that cannot be read, or a file of another version, each with what to do. On the desktop the line has the close
+  control; the editor and the phones get it as their second row. Nothing is shown until the first read of the project has finished.
+
 ## 0.3.0 (2026-10-21)
 
 - **Breaking:** the band no longer works the chain out itself. It draws `.sdlc/local/band.json`, which ai-sdlc writes (version 1:
