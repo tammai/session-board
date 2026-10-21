@@ -12,8 +12,14 @@ export type Usage = {
   limits: { kind: string; pct: number; resetsAt?: number | null }[]
 }
 
-/** The project's spend, the second half of the band's `$session/$project`. Null when it could not be read. */
-export type Status = { projectCost: number | null }
+/** The project's spend, the second half of the band's `$session/$project` (null when it could not be read), and why the AI-SDLC line is missing. */
+/**
+ * Why the AI-SDLC line cannot be drawn, once the project has been read: no `.sdlc` folder, no band file in it, a file that does not
+ * parse, or a file of another version. Null while the line can be drawn, and before the first read.
+ */
+export type BandNote = 'no-sdlc' | 'no-file' | 'unreadable' | 'version'
+
+export type Status = { projectCost: number | null; note: BandNote | null }
 
 /** Whether the band shows: null follows the `openOnStart` option; `/session-board open` and `close` set it. */
 export type View = { isShown: boolean | null }

@@ -24,7 +24,7 @@ use the + next to the prompt box, then Plugins, then Add marketplace.
 
 ## What it shows
 
-One line, the same on the terminal and the desktop app. It appears only in a project where ai-sdlc has written `.sdlc/local/band.json` (see below):
+One line, the same on the terminal and the desktop app, drawn from the `.sdlc/local/band.json` that ai-sdlc writes (see below):
 
 ```
 AI-SDLC · Build · Tier M · 2026-10-20-playable-loop         ✔─✔─✔─◉─○─○─○─○  8/9
@@ -39,7 +39,7 @@ AI-SDLC · Build · Tier M · 2026-10-20-playable-loop         ✔─✔─✔�
 The terminal draws it in glyphs inside an orange border; hide it with `/session-board close`. The desktop app draws the pipeline as one
 small drawing (a ticked disc for a step done, a ringed dot with a halo for the step now, an open ring for a step to come), with a
 close control (`×`) at the end, in the host's own frame (the band draws no border of its own), all in one size of type in the host's font. A
-project with no ai-sdlc files has no band on either. The editor and the phones get a two-row card (the model and its effort, the limits
+project with no AI-SDLC shows the friendly line instead (see "When something is unavailable"). The editor and the phones get a two-row card (the model and its effort, the limits
 as bars, the spend, then the AI-SDLC row) in an orange border.
 
 ## Commands
@@ -50,7 +50,17 @@ whether it shows when a session starts.
 ## When something is unavailable
 
 Any value that cannot be read shows `N/A` and the band keeps drawing: no rate-limit data, a missing cost ledger, a malformed
-band file. A project without one has no band; the board never works the chain out itself.
+band file; the board never works the chain out itself. Where the AI-SDLC line cannot be drawn, the band says why in a line of its own,
+and what to do:
+
+| Why | The band says |
+|---|---|
+| no `.sdlc` folder | `AI-SDLC · No AI-SDLC in this project, so there is nothing to show here. /session-board close hides this.` |
+| a folder, but no band file | `AI-SDLC · AI-SDLC is here but has not written its band file yet. Update ai-sdlc, then run any sdlc command.` |
+| a file that does not parse | `AI-SDLC · AI-SDLC's band file could not be read. It is rewritten on the next sdlc command.` |
+| a file of another version | `AI-SDLC · AI-SDLC's band file is of a version this session-board does not know. Update session-board or ai-sdlc.` |
+
+Until the first read of the project has finished the band shows nothing, so it does not flash a wrong message.
 
 ## What it reads, and what it never does
 

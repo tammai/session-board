@@ -69,10 +69,10 @@ async function readSources($: EngineInterface) {
   // The session's id and spend so far feed the board's own project ledger (the statusline sanitises the id the same way).
   const sessionId = ((await safe(() => $.session.id())) ?? '').replace(/[^A-Za-z0-9_-]/g, '') || null
   const sessionCost = (await getUsage($)).costUsd
-  const [projectCost, found] = await Promise.all([root ? trackProjectCost(io, root, sessionId, sessionCost) : null, root ? readSdlc(io, root) : null])
-  const next: Status = { projectCost }
+  const [projectCost, found] = await Promise.all([root ? trackProjectCost(io, root, sessionId, sessionCost) : null, root ? readSdlc(io, root) : { sdlc: null, note: 'no-sdlc' as const }])
+  const next: Status = { projectCost, note: found.note }
   if (JSON.stringify(next) !== JSON.stringify(await getStatus($))) await update($, status, () => next)
-  if (JSON.stringify(found) !== JSON.stringify(await read($, sdlc))) await update($, sdlc, () => found)
+  if (JSON.stringify(found.sdlc) !== JSON.stringify(await read($, sdlc))) await update($, sdlc, () => found.sdlc)
 }
 
 /**
@@ -190,8 +190,9 @@ export const register: Register = (on, options) => {
     if (e.props.hasSurvey || !(v.isShown ?? cfg.openOnStart)) return next(e)
     const els = $.ui.resolve(e)
     const [m, u, s, sd, now] = await Promise.all([getMain($), getUsage($), getStatus($), getSdlc($), $.clock.now()])
-    // the desktop and the terminal have nothing to show where the project has no ai-sdlc files
-    if (!sd && (e.surface === 'desktop' || e.surface === 'terminal')) return next(e)
+    // the desktop and the terminal have nothing to draw until the project has been read, and no line of the band without ai-sdlc's file
+    // unless there is a reason to give: then the band says why, in a line of its own
+    if (!sd && !s.note && (e.surface === 'desktop' || e.surface === 'terminal')) return next(e)
     return bandRow({ els, C, main: m, usage: u, status: s, now, sdlc: sd, W: Math.max(40, e.props.bodyColumns), surface: e.surface, onClose: () => void setShown($, false) })
   })
 }

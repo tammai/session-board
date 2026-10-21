@@ -2,7 +2,7 @@
 // is drawn as N/A: a missing file, bad JSON or no home directory never throws out of here.
 import type { EngineInterface } from 'claude-code'
 
-import type { Sdlc } from '../types'
+import type { BandNote, Sdlc } from '../types'
 import { BAND_FILE, parseBand } from './sdlc'
 import { applySession, normalizeLedger, normalizeProject, projectKey, projectTotal } from './statusline'
 import type { Ledger } from './statusline'
@@ -87,9 +87,18 @@ export const trackProjectCost = async (io: Io, projectDir: string, sessionId: st
 
 // ---------------------------------------------------------------- ai-sdlc
 
-/** The AI-SDLC line's data, as ai-sdlc wrote it to `.sdlc/local/band.json`; null when there is no such file, or it is not one the board knows. */
-export const readSdlc = async (io: Io, root: string): Promise<Sdlc | null> => {
-  const file = await safe(() => io.read(`${normalizeProject(root)}/${BAND_FILE}`))
-  if (file === null) return null
-  return parseBand(await safe(async () => JSON.parse(file) as unknown))
+/**
+ * The AI-SDLC line's data, as ai-sdlc wrote it to `.sdlc/local/band.json`; with none, the note that says why: no `.sdlc` folder, no
+ * file in it, a file that does not parse, or an object of another version (or none).
+ */
+export const readSdlc = async (io: Io, root: string): Promise<{ sdlc: Sdlc | null; note: BandNote | null }> => {
+  const r = normalizeProject(root)
+  if (!(await safe(() => io.list(`${r}/.sdlc`)))) return { sdlc: null, note: 'no-sdlc' }
+  const file = await safe(() => io.read(`${r}/${BAND_FILE}`))
+  if (file === null) return { sdlc: null, note: 'no-file' }
+  const raw = await safe(async () => JSON.parse(file) as unknown)
+  const sdlc = parseBand(raw)
+  if (sdlc) return { sdlc, note: null }
+  // an object is a file of another version (or of none); anything else is not a file of ai-sdlc's at all
+  return { sdlc: null, note: typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? 'version' : 'unreadable' }
 }

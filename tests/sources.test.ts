@@ -44,20 +44,24 @@ const fakeIo = (files: Record<string, string>, extra: Partial<Io> = {}, store = 
   return io
 }
 
-test('the AI-SDLC line is read from the band file ai-sdlc wrote, and from nothing else; no file, no line', async () => {
+test('the AI-SDLC line is read from the band file ai-sdlc wrote, and from nothing else', async () => {
   const files: Record<string, string> = {
     '/p/.sdlc/local/band.json': band(REVIEW),
     '/p/.sdlc/local/state.json': JSON.stringify({ active: 'another' }),
     '/p/docs/sdlc/another/intent.md': '---\nartifact: intent\n---\n',
   }
   const reader = fakeIo(files)
-  expect(await readSdlc(reader, '/p')).toEqual(REVIEW)
+  expect(await readSdlc(reader, '/p')).toEqual({ sdlc: REVIEW, note: null })
   expect(reader.reads).toEqual(['/p/.sdlc/local/band.json']) // the state and the change's documents are not read
-  expect(await readSdlc(fakeIo({}), '/empty')).toBe(null)
-  expect(await readSdlc(fakeIo({ '/p/.sdlc/config.json': '{}' }), '/p')).toBe(null) // an .sdlc folder with no band file
 })
 
-test('anything unreadable is null, never a throw: failing io, garbage json, a file of another shape', async () => {
+test('with no line to draw the reason is named: no .sdlc folder, no band file, a file that cannot be read, another version; never a throw', async () => {
+  const none = { sdlc: null }
+  expect(await readSdlc(fakeIo({}), '/empty')).toEqual({ ...none, note: 'no-sdlc' })
+  expect(await readSdlc(fakeIo({ '/p/.sdlc/config.json': '{}' }), '/p')).toEqual({ ...none, note: 'no-file' })
+  for (const text of ['garbage', '[]', '"x"', 'null', '{"version":1']) expect(await readSdlc(fakeIo({ '/p/.sdlc/local/band.json': text }), '/p')).toEqual({ ...none, note: 'unreadable' })
+  expect(await readSdlc(fakeIo({ '/p/.sdlc/local/band.json': JSON.stringify({ version: 2, activeId: 'x' }) }), '/p')).toEqual({ ...none, note: 'version' })
+  expect(await readSdlc(fakeIo({ '/p/.sdlc/local/band.json': '{"activeId":"x"}' }), '/p')).toEqual({ ...none, note: 'version' }) // a file with no version at all
   const dead = fakeIo({}, {
     read: async () => {
       throw new Error('boom')
@@ -67,8 +71,7 @@ test('anything unreadable is null, never a throw: failing io, garbage json, a fi
     },
   })
   expect(await trackProjectCost(dead, '/p', 'live', null)).toBe(null)
-  expect(await readSdlc(dead, '/p')).toBe(null)
-  for (const text of ['garbage', '[]', '"x"', 'null', '{"version":1']) expect(await readSdlc(fakeIo({ '/p/.sdlc/local/band.json': text }), '/p')).toBe(null)
+  expect(await readSdlc(dead, '/p')).toEqual({ ...none, note: 'no-sdlc' })
 })
 
 test("the project total is the board's own ledger: the statusline's records are imported once, never read again", async () => {

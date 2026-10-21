@@ -2,6 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { NOTES } from '../hooks/sdlc'
 import { REVIEW, SHIPPED as SHIPPED_BAND, band as bandFile, steps } from './fixtures/sdlc'
 
 // ---------------------------------------------------------------- a mocked host
@@ -199,7 +200,7 @@ test('the editor band says working during a turn and idle after it', async ($, o
   await idle.unmount()
 })
 
-test('with nothing readable the editor band still draws, every missing value as N/A', async ($, on) => {
+test('with nothing readable the editor band still draws, every missing value as N/A, and says there is no AI-SDLC', async ($, on) => {
   mock.clock(on)
   on('command.register', () => ({ value: { command: 'session-board' } }) as never)
   on('session.start', () => ({ cwd: ROOT }) as never)
@@ -207,7 +208,7 @@ test('with nothing readable the editor band still draws, every missing value as 
   await begin($)
   const desktop = await $.ui.mount({ ...band(100), surface: 'vscode' })
   expect(await rowOf(desktop, 'band-main')).toBe('○IdleN/AN/ActxN/A5hN/A7dN/AN/A / N/A')
-  expect(await desktop.find({ key: 'band-progress' })).toBeUndefined()
+  expect(await rowOf(desktop, 'band-progress')).toContain('No AI-SDLC in this project')
   await desktop.unmount()
 })
 
@@ -250,20 +251,6 @@ test('a tier S change shows its spec and review as skipped; a closed one says cl
   await desktop.unmount()
 })
 
-test('a project with no ai-sdlc files has no band in the terminal, as on the desktop; the editor keeps its card', async ($, on) => {
-  host(on, { [`${ROOT}/README.md`]: '# hi' })
-  on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'Text', children: ['the engine band'] }) as never)
-  await begin($)
-  const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await ui.find({ text: /^the engine band$/ })).toBeDefined()
-  expect(await ui.find({ key: 'band-panel' })).toBeUndefined()
-  await ui.unmount()
-  const editor = await $.ui.mount({ ...band(100), surface: 'vscode' })
-  expect(await editor.find({ text: /^AI-SDLC/ })).toBeUndefined()
-  expect(await editor.find({ key: 'band-main' })).toBeDefined() // the rest of the card is unaffected
-  await editor.unmount()
-})
-
 test('a band file with no active change reads "no active change"; an .sdlc folder with no band file has no band', async ($, on) => {
   host(on, { [`${ROOT}/.sdlc/local/band.json`]: bandFile({ activeId: null }) })
   await begin($)
@@ -274,20 +261,45 @@ test('a band file with no active change reads "no active change"; an .sdlc folde
   }
 })
 
-test('an .sdlc folder from an ai-sdlc that writes no band file shows no band, and so does a file of another version', async ($, on) => {
-  const files: Record<string, string> = { [`${ROOT}/.sdlc/config.json`]: '{}' }
+test('where the band cannot be drawn it says why, in a friendly line of its own: no AI-SDLC, no band file yet, a file that cannot be read, another version', async ($, on) => {
+  const files: Record<string, string> = { [`${ROOT}/README.md`]: '# hi' }
   host(on, files)
   on('turn.complete', () => ({ text: '' }))
   on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'Text', children: ['the engine band'] }) as never)
   await begin($)
-  const none = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await none.find({ text: /^the engine band$/ })).toBeDefined()
-  await none.unmount()
+  const say = async (surface: string, key: string) => {
+    const ui = await $.ui.mount({ ...band(100), surface })
+    const row = await rowOf(ui, key)
+    const isEngine = (await ui.find({ text: /^the engine band$/ })) !== undefined
+    const hasClose = JSON.stringify(await ui.drawn()).includes('"role":"dismiss"')
+    await ui.unmount()
+    return { row, isEngine, hasClose }
+  }
+  const settle = async () => {
+    await $.turn.complete({ turnId: 'T1', reason: 'answer', durationMs: 1, answer: '' } as never)
+  }
+  await settle()
+  // no .sdlc folder: it says so, and how to hide the line
+  expect(await say('terminal', 'band-panel')).toEqual({ row: `AI-SDLC · ${NOTES['no-sdlc']}`, isEngine: false, hasClose: false })
+  const desktop = await say('desktop', 'band-panel')
+  expect(desktop.row).toBe(`AI-SDLC·${NOTES['no-sdlc']}×`) // on the desktop with the close control
+  expect(desktop.hasClose).toBe(true)
+  expect((await say('vscode', 'band-progress')).row).toBe(`AI-SDLC${NOTES['no-sdlc']}`)
+  // an .sdlc folder from an ai-sdlc that writes no band file
+  files[`${ROOT}/.sdlc/config.json`] = '{}'
+  await settle()
+  expect((await say('terminal', 'band-panel')).row).toBe(`AI-SDLC · ${NOTES['no-file']}`)
+  // a file that does not parse, and a file of another version
+  files[`${ROOT}/.sdlc/local/band.json`] = '{not json'
+  await settle()
+  expect((await say('terminal', 'band-panel')).row).toBe(`AI-SDLC · ${NOTES.unreadable}`)
   files[`${ROOT}/.sdlc/local/band.json`] = JSON.stringify({ version: 2, ...REVIEW })
-  await $.turn.complete({ turnId: 'T1', reason: 'answer', durationMs: 1, answer: '' } as never)
-  const other = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await other.find({ key: 'band-panel' })).toBeUndefined()
-  await other.unmount()
+  await settle()
+  expect((await say('desktop', 'band-panel')).row).toBe(`AI-SDLC·${NOTES.version}×`)
+  // and the band is back as soon as ai-sdlc writes a file the board knows
+  files[`${ROOT}/.sdlc/local/band.json`] = bandFile(REVIEW)
+  await settle()
+  expect((await say('terminal', 'band-panel')).row).toContain('AI-SDLC · Review · Tier M')
 })
 
 // ---------------------------------------------------------------- the desktop
@@ -324,16 +336,6 @@ test('on the desktop the band is one line of AI-SDLC with no border of its own a
   const again = await $.ui.mount({ ...band(100), surface: 'desktop' })
   expect(await again.find({ key: 'band-panel' })).toBeDefined()
   await again.unmount()
-})
-
-test('on the desktop a project with no ai-sdlc files has no band at all', async ($, on) => {
-  host(on, { [`${ROOT}/README.md`]: '# hi' })
-  on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'Text', children: ['the engine band'] }) as never)
-  await begin($)
-  const ui = await $.ui.mount({ ...band(100), surface: 'desktop' })
-  expect(await ui.find({ text: /^the engine band$/ })).toBeDefined()
-  expect(await ui.find({ key: 'band-panel' })).toBeUndefined()
-  await ui.unmount()
 })
 
 // ---------------------------------------------------------------- when it reads

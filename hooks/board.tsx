@@ -2,12 +2,12 @@
 // Every value that could not be read is null and is drawn as N/A.
 import type { EngineInterface } from 'claude-code'
 
-import type { Sdlc, StageState } from '../types'
+import type { BandNote, Sdlc, StageState } from '../types'
 import { widthOf } from './core'
 import type { Colors } from './core'
 import type { MainProps } from './main'
 import { desktopPanel, desktopRows } from './desktop'
-import { LABELS, STAGES, nowNext, stageLinks } from './sdlc'
+import { LABELS, NOTES, STAGES, nowNext, stageLinks } from './sdlc'
 import { NA } from './statusline'
 
 export type Els = ReturnType<EngineInterface['ui']['resolve']>
@@ -86,6 +86,21 @@ export const progressLine = ({ els, C, sdlc }: { els: Els; C: Colors; sdlc: Sdlc
   )
 }
 
+/** The terminal's line when the AI-SDLC line cannot be drawn: the title, then what is missing and what to do. */
+export const noteLine = ({ els, C, note }: { els: Els; C: Colors; note: BandNote }) => {
+  const { Box, Text } = els
+  return (
+    <Box key="band-panel">
+      <Text wrap="truncate">
+        <Text bold color={C.border}>
+          AI-SDLC
+        </Text>
+        <Text color={C.dim}>{` · ${NOTES[note]}`}</Text>
+      </Text>
+    </Box>
+  )
+}
+
 export type BandProps = MainProps & { sdlc: Sdlc | null; W: number; surface: string; onClose?: () => void }
 
 /**
@@ -108,7 +123,7 @@ export const bandRow = (p: BandProps) => {
   }
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={p.C.main} paddingX={1} width={widthOf(p.surface, p.W)}>
-      {p.sdlc ? progressLine({ els: p.els, C: p.C, sdlc: p.sdlc }) : null}
+      {p.sdlc ? progressLine({ els: p.els, C: p.C, sdlc: p.sdlc }) : p.status.note ? noteLine({ els: p.els, C: p.C, note: p.status.note }) : null}
     </Box>
   )
 }

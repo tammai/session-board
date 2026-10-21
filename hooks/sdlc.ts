@@ -1,6 +1,6 @@
 // The AI-SDLC line's data. ai-sdlc works out where a change stands (its `chainStatus`) and writes it to `.sdlc/local/band.json`; the
 // board only reads that file (hooks/sources.ts), validates it here, and draws it. Pure: nothing here touches `$`.
-import type { BuildRow, Sdlc, Stage, StageState } from '../types'
+import type { BandNote, BuildRow, Sdlc, Stage, StageState } from '../types'
 import { clean } from './core'
 
 /** Where ai-sdlc writes the band's data, from the project root. */
@@ -64,4 +64,12 @@ export const parseBand = (raw: unknown): Sdlc | null => {
   const activeId = text(raw.activeId)
   if (!activeId) return { activeId: null, tier: null, stages: null, next: null, build: null }
   return { activeId, tier: text(raw.tier), stages: stagesOf(raw.stages), next: text(raw.next), build: rowsOf(raw.build) }
+}
+
+/** What the band says in place of the AI-SDLC line when it cannot be drawn: what is missing, and what to do about it. */
+export const NOTES: Record<BandNote, string> = {
+  'no-sdlc': 'No AI-SDLC in this project, so there is nothing to show here. /session-board close hides this.',
+  'no-file': 'AI-SDLC is here but has not written its band file yet. Update ai-sdlc, then run any sdlc command.',
+  unreadable: "AI-SDLC's band file could not be read. It is rewritten on the next sdlc command.",
+  version: "AI-SDLC's band file is of a version this session-board does not know. Update session-board or ai-sdlc.",
 }

@@ -6,7 +6,7 @@ import type { BandProps } from './board'
 import { barSvg, stepperSvg } from './graphics'
 import type { Drawing } from './graphics'
 import { modelOf, toneColor, windowOf } from './main'
-import { LABELS, nowNext } from './sdlc'
+import { LABELS, NOTES, nowNext } from './sdlc'
 import { NA, money, pctText, toneOf, untilReset } from './statusline'
 
 /** The track under a bar and the grey of a step to come: a mid-tone that reads on light and dark. */
@@ -79,12 +79,21 @@ const kit = ({ els, C, main, usage, status, now, sdlc }: BandProps) => {
 
   /** The AI-SDLC row: title, the pipeline, now and next, the build's progress, the change and its tier. Null without ai-sdlc files. */
   const sdlcRow = () => {
-    if (!sdlc) return null
     const title = (
       <Text key="title" weight="semibold" color={C.accent}>
         AI-SDLC
       </Text>
     )
+    if (!sdlc) {
+      return status.note ? (
+        <Box key="band-progress" alignItems="center" columnGap="sm">
+          {title}
+          <Text wrap="truncate" color={C.dim}>
+            {NOTES[status.note]}
+          </Text>
+        </Box>
+      ) : null
+    }
     if (!sdlc.activeId || !sdlc.stages) {
       return (
         <Box key="band-progress" alignItems="center" columnGap="sm">
@@ -153,23 +162,27 @@ export const desktopRows = (p: BandProps) => {
 /**
  * The desktop app's band: one line of the AI-SDLC alone: the title, the step now, the tier, the change (cut at the edge), the small pipeline with
  * the build's count after it, and the close control. No border of its own: the host frames the band (a grey rounded box), and a
- * second one doubles it. Null without ai-sdlc files, or off the desktop.
+ * second one doubles it. Without an ai-sdlc line it says why (`NOTES`); null where it has nothing to say, or off the desktop.
  */
 export const desktopPanel = (p: BandProps & { onClose: () => void }) => {
-  const { els, C, sdlc } = p
-  if (!sdlc || !('Svg' in els) || !('Button' in els)) return null
+  const { els, C, sdlc, status } = p
+  if ((!sdlc && !status.note) || !('Svg' in els) || !('Button' in els)) return null
   const { Box, Text, Svg, Button } = els
-  const stages = sdlc.stages
+  const stages = sdlc?.stages ?? null
   const current = stages ? nowNext(stages).now : null
-  const total = sdlc.build?.length ?? 0
-  const passed = sdlc.build?.filter(r => r.verdict === 'pass').length ?? 0
+  const total = sdlc?.build?.length ?? 0
+  const passed = sdlc?.build?.filter(r => r.verdict === 'pass').length ?? 0
   const pipeline = stages ? stepperSvg(stages, { done: C.git, current: C.folder, grey: GREY }) : null
 
   // the title, the step now, the tier and the change, each after a small dot
-  const parts = [
+  const title = (
     <Text key="title" weight="semibold" color={C.accent}>
       AI-SDLC
-    </Text>,
+    </Text>
+  )
+  // with no ai-sdlc line to draw: the title and what is missing
+  const parts = !sdlc ? [title, <Text key="note" wrap="truncate" color={C.dim}>{status.note ? NOTES[status.note] : ''}</Text>] : [
+    title,
     // the step now, in orange like its mark; a closed change has none (its outcome follows the change)
     current ? (
       <Text key="current" weight="semibold" color={C.folder}>

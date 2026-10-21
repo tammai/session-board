@@ -8,7 +8,7 @@ export const SCHEMA_VERSION = 1
 
 export const DEFAULT_MAIN: Main = { model: null, effort: null, isRunning: false }
 export const DEFAULT_USAGE: Usage = { pct: null, costUsd: null, limits: [] }
-export const DEFAULT_STATUS: Status = { projectCost: null }
+export const DEFAULT_STATUS: Status = { projectCost: null, note: null }
 export const DEFAULT_VIEW: View = { isShown: null }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
