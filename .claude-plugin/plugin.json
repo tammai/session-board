@@ -1,6 +1,6 @@
 {
   "name": "session-board",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A band above the Claude Code prompt: model, context, limits and spend, and AI-SDLC progress read from your repo. Read-only; unreadable values show N/A.",
   "author": { "name": "Tam Mai", "url": "https://github.com/tammai" },
   "homepage": "https://github.com/tammai/session-board",

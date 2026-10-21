@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 (2026-10-21)
+
+- **Breaking:** the band no longer works the chain out itself. It draws `.sdlc/local/band.json`, which ai-sdlc writes (version 1:
+  `activeId`, `tier`, `next`, the eight `stages`, the `build` rows; see "The band file" in the README), and no longer reads the
+  change's documents, `state.json`, `config.json` or `knowledges/log.md`. A project whose ai-sdlc writes no such file, or a file of
+  another version, has no band. Needs an ai-sdlc that writes the file.
+- **Change:** the terminal band is the desktop's line in glyphs, in an orange border: `AI-SDLC · Build · Tier M · <change>`, then
+  the eight marks and the build's count (`8/9`). The main line (model, limits, spend) is gone from the terminal, and a project with
+  no ai-sdlc band has none there. The editor and the phones keep their two-row card.
+- **Change:** the desktop band's close control is a plain `×`; the host frames the band, and the band draws no border of its own.
+
 ## 0.2.0 (2026-10-20)
 
 - **Change:** only the band above the prompt is left. The pane, the Main, AI-SDLC, Agents and Gate panels, the two-column and
