@@ -1,76 +1,17 @@
-// Pure ai-sdlc logic: front matter, stage rules, build rows. The stage order is
-// ported from ai-sdlc's `chainStatus` (plugin/scripts/lib.mjs), so the board agrees with `sdlc status`.
-import type { BuildRow, Stage, StageState } from '../types'
+// The AI-SDLC line's data. ai-sdlc works out where a change stands (its `chainStatus`) and writes it to `.sdlc/local/band.json`; the
+// board only reads that file (hooks/sources.ts), validates it here, and draws it. Pure: nothing here touches `$`.
+import type { BuildRow, Sdlc, Stage, StageState } from '../types'
 import { clean } from './core'
 
-export type Meta = Record<string, string>
+/** Where ai-sdlc writes the band's data, from the project root. */
+export const BAND_FILE = '.sdlc/local/band.json'
 
-/** A change's documents by kind: its front matter, or absent when the file is missing. */
-export type ChangeDocs = Partial<Record<'intent' | 'design' | 'ui' | 'spec' | 'plan' | 'verify' | 'review', Meta>>
-
-/** The `key: value` lines between the `---` fences, or null when the text has no front matter. */
-export const parseFrontMatter = (text: string): Meta | null => {
-  const m = /^﻿?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
-  if (!m || m[1] === undefined) return null
-  const meta: Meta = {}
-  for (const line of m[1].split(/\r?\n/)) {
-    const kv = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
-    if (kv?.[1] !== undefined) meta[kv[1]] = clean(kv[2] ?? '').trim()
-  }
-  return meta
-}
+/** The file's own version: a file of another version reads as none, so the band waits for ai-sdlc to write one it knows. */
+export const BAND_VERSION = 1
 
 /** The pipeline's eight steps, in order, and what each is called. */
 export const STAGES: Stage[] = ['intent', 'spec', 'plan', 'build', 'verify', 'review', 'ship', 'knowledge']
 export const LABELS: Record<Stage, string> = { intent: 'Intent', spec: 'Spec', plan: 'Plan', build: 'Build', verify: 'Verify', review: 'Review', ship: 'Ship', knowledge: 'Knowledge' }
-
-/**
- * Where a change stands: its tier, the next step (as `sdlc status` names it) and each stage's state.
- * Tier S has no spec or review; a design (tier L, or one that exists) and a ui doc are part of the spec stage.
- */
-export const stageOf = (docs: ChangeDocs, isKnowledgeLogged = false, isBuildOpen = false): { tier: string; next: string; stages: Record<Stage, StageState> } => {
-  const tier = docs.intent?.tier || 'M'
-  const st = (k: keyof ChangeDocs) => (docs[k] ? docs[k]?.status || 'draft' : 'missing')
-  const outcome = docs.intent?.outcome || ''
-  const needsDesign = tier === 'L' || Boolean(docs.design)
-
-  let next: string
-  if (st('intent') === 'rejected') next = 'closed (intent rejected)'
-  else if (st('intent') !== 'approved') next = 'intent'
-  else if (needsDesign && st('design') !== 'approved') next = 'design'
-  else if (docs.ui && st('ui') !== 'approved') next = 'ui'
-  else if (tier !== 'S' && st('spec') !== 'approved') next = 'spec'
-  else if (st('plan') !== 'approved') next = 'plan'
-  else if (st('verify') !== 'passed' || isBuildOpen) next = 'build'
-  else if (tier !== 'S' && st('review') !== 'approved') next = 'review'
-  else next = 'ship'
-  if (outcome && next === 'ship') next = `closed (${outcome})`
-
-  const isDone: Record<Stage, boolean> = {
-    intent: st('intent') === 'approved',
-    spec: st('spec') === 'approved' && (!needsDesign || st('design') === 'approved') && (!docs.ui || st('ui') === 'approved'),
-    plan: st('plan') === 'approved',
-    // building ends where verify.md begins; verifying ends when it passes
-    build: st('verify') !== 'missing' && !isBuildOpen,
-    verify: st('verify') === 'passed' && !isBuildOpen,
-    review: st('review') === 'approved',
-    ship: outcome === 'shipped',
-    // the knowledge step leaves a line for the change in knowledges/log.md
-    knowledge: isKnowledgeLogged,
-  }
-  const stages = {} as Record<Stage, StageState>
-  let hasCurrent = false
-  for (const s of STAGES) {
-    if ((s === 'spec' || s === 'review') && tier === 'S') stages[s] = 'skipped'
-    // build and verify are read from verify.md: a stale one must not tick them while an earlier step is still in progress
-    else if (isDone[s] && !((s === 'build' || s === 'verify') && hasCurrent && !outcome)) stages[s] = 'done'
-    else if (!hasCurrent && !outcome) {
-      stages[s] = 'current'
-      hasCurrent = true
-    } else stages[s] = 'todo'
-  }
-  return { tier, next, stages }
-}
 
 /** Whether the line after each stage (the one joining it to the next) is lit: up to the furthest stage reached. */
 export const stageLinks = (stages: Record<Stage, StageState>): boolean[] => {
@@ -85,19 +26,42 @@ export const nowNext = (stages: Record<Stage, StageState>): { now: Stage | null;
   return { now, next }
 }
 
-/** The build loop's steps (`state.build[id].steps`) as rows; any other shape gives none. */
-export const buildRows = (steps: unknown): BuildRow[] => {
-  if (typeof steps !== 'object' || steps === null || Array.isArray(steps)) return []
-  const rows: BuildRow[] = []
-  for (const [step, v] of Object.entries(steps as Record<string, unknown>)) {
-    if (typeof v !== 'object' || v === null) continue
-    const s = v as { rounds?: unknown; model?: unknown; verdict?: unknown }
-    rows.push({
-      step: clean(step),
-      rounds: typeof s.rounds === 'number' && Number.isFinite(s.rounds) ? s.rounds : 0,
-      model: typeof s.model === 'string' ? clean(s.model) : '',
-      verdict: typeof s.verdict === 'string' ? clean(s.verdict) : null,
-    })
+const STATES: StageState[] = ['done', 'current', 'todo', 'skipped']
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const text = (v: unknown) => (typeof v === 'string' && clean(v).trim() !== '' ? clean(v).trim() : null)
+
+/** The eight steps' states, or null unless every step has one of the four. */
+const stagesOf = (v: unknown): Record<Stage, StageState> | null => {
+  if (!isObject(v)) return null
+  const out = {} as Record<Stage, StageState>
+  for (const s of STAGES) {
+    const state = v[s]
+    if (typeof state !== 'string' || !STATES.includes(state as StageState)) return null
+    out[s] = state as StageState
   }
-  return rows
+  return out
+}
+
+/** The build loop's steps as rows; a row of any other shape is dropped, a value that is no list gives null. */
+const rowsOf = (v: unknown): BuildRow[] | null =>
+  Array.isArray(v)
+    ? v.filter(isObject).map(r => ({
+        step: text(r.step) ?? '',
+        rounds: typeof r.rounds === 'number' && Number.isFinite(r.rounds) ? r.rounds : 0,
+        model: text(r.model) ?? '',
+        verdict: text(r.verdict),
+      }))
+    : null
+
+/**
+ * The AI-SDLC line's data from the parsed band file. None (no band) when it is not a version-1 object. A file with no active
+ * change draws as "no active change"; any value of another shape inside one is unknown (null), never a throw, and every string
+ * is stripped of control characters before it reaches the terminal.
+ */
+export const parseBand = (raw: unknown): Sdlc | null => {
+  if (!isObject(raw) || raw.version !== BAND_VERSION) return null
+  const activeId = text(raw.activeId)
+  if (!activeId) return { activeId: null, tier: null, stages: null, next: null, build: null }
+  return { activeId, tier: text(raw.tier), stages: stagesOf(raw.stages), next: text(raw.next), build: rowsOf(raw.build) }
 }

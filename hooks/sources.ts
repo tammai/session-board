@@ -3,8 +3,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Sdlc } from '../types'
-import { buildRows, parseFrontMatter, stageOf } from './sdlc'
-import type { ChangeDocs } from './sdlc'
+import { BAND_FILE, parseBand } from './sdlc'
 import { applySession, normalizeLedger, normalizeProject, projectKey, projectTotal } from './statusline'
 import type { Ledger } from './statusline'
 
@@ -39,13 +38,6 @@ export const safe = async <T>(work: () => Promise<T>): Promise<T | null> => {
   } catch {
     return null
   }
-}
-
-const readJson = async (io: Io, path: string): Promise<Record<string, unknown> | null> => {
-  const text = await safe(() => io.read(path))
-  if (text === null) return null
-  const parsed = await safe(async () => JSON.parse(text) as unknown)
-  return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null
 }
 
 // ---------------------------------------------------------------- cost
@@ -95,45 +87,9 @@ export const trackProjectCost = async (io: Io, projectDir: string, sessionId: st
 
 // ---------------------------------------------------------------- ai-sdlc
 
-const KINDS = ['intent', 'design', 'ui', 'spec', 'plan', 'verify', 'review'] as const
-
-/** A change's documents' front matter; a missing file is absent, a file with none is absent too. */
-const readDocs = async (io: Io, dir: string): Promise<ChangeDocs> => {
-  const docs: ChangeDocs = {}
-  for (const kind of KINDS) {
-    const text = await safe(() => io.read(`${dir}/${kind}.md`))
-    const meta = text === null ? null : parseFrontMatter(text)
-    if (meta) docs[kind] = meta
-  }
-  return docs
-}
-
-const SAFE_ID = /^[A-Za-z0-9._-]+$/
-
-/** The AI-SDLC line's data from the repo's files: the active change, or null when the project has no ai-sdlc files. */
+/** The AI-SDLC line's data, as ai-sdlc wrote it to `.sdlc/local/band.json`; null when there is no such file, or it is not one the board knows. */
 export const readSdlc = async (io: Io, root: string): Promise<Sdlc | null> => {
-  const r = normalizeProject(root)
-  const config = await readJson(io, `${r}/.sdlc/config.json`)
-  const configured = typeof config?.artifactsDir === 'string' ? normalizeProject(config.artifactsDir) : ''
-  const artifacts = configured && !configured.startsWith('/') && !/^[A-Za-z]:/.test(configured) && !configured.split('/').includes('..') ? configured : 'docs/sdlc'
-  const base = `${r}/${artifacts}`
-
-  const hasSdlc = await safe(() => io.list(`${r}/.sdlc`))
-  const folders = await safe(() => io.list(base))
-  if (!hasSdlc && !folders) return null
-
-  const state = await readJson(io, `${r}/.sdlc/local/state.json`)
-  const active = typeof state?.active === 'string' && SAFE_ID.test(state.active) && state.active !== '..' ? state.active : null
-
-  const steps = active ? (state?.build as Record<string, { steps?: unknown }> | undefined)?.[active]?.steps : undefined
-  const build = active && state ? buildRows(steps) : null
-  let activeView: Pick<Sdlc, 'tier' | 'stages' | 'next'> = { tier: null, stages: null, next: null }
-  if (active) {
-    const docs = await readDocs(io, `${base}/${active}`)
-    // The knowledge step is done once knowledges/log.md has a line for this change.
-    const log = await safe(() => io.read(`${r}/knowledges/log.md`))
-    if (docs.intent) activeView = stageOf(docs, log !== null && log.includes(active), build?.some(b => b.verdict !== 'pass') === true)
-  }
-
-  return { activeId: active, ...activeView, build }
+  const file = await safe(() => io.read(`${normalizeProject(root)}/${BAND_FILE}`))
+  if (file === null) return null
+  return parseBand(await safe(async () => JSON.parse(file) as unknown))
 }

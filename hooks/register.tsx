@@ -183,15 +183,15 @@ export const register: Register = (on, options) => {
 
   // ---------------------------------------------------------------- drawing
 
-  // The band: the main line and one AI-SDLC line above the prompt, unless it was closed or a survey is up. The desktop app shows
-  // the AI-SDLC row alone, and closing it there is a press of its close control.
+  // The band: one AI-SDLC line above the prompt (the desktop app and the terminal), or a two-row card with the model, limits and spend
+  // (the editor, the phones), unless it was closed or a survey is up. Closing it on the desktop is a press of its close control.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const v = await getView($)
     if (e.props.hasSurvey || !(v.isShown ?? cfg.openOnStart)) return next(e)
     const els = $.ui.resolve(e)
     const [m, u, s, sd, now] = await Promise.all([getMain($), getUsage($), getStatus($), getSdlc($), $.clock.now()])
-    // the desktop has nothing to show where the project has no ai-sdlc files
-    if (e.surface === 'desktop' && !sd) return next(e)
+    // the desktop and the terminal have nothing to show where the project has no ai-sdlc files
+    if (!sd && (e.surface === 'desktop' || e.surface === 'terminal')) return next(e)
     return bandRow({ els, C, main: m, usage: u, status: s, now, sdlc: sd, W: Math.max(40, e.props.bodyColumns), surface: e.surface, onClose: () => void setShown($, false) })
   })
 }

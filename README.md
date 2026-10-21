@@ -1,10 +1,10 @@
 # session-board
 
-A band above the prompt in Claude Code, in the terminal and the desktop app. Two lines: the model and its limits and spend, and
-your ai-sdlc progress, from real session events and the files in your project.
+A band above the prompt in Claude Code, in the terminal and the desktop app: one line of your ai-sdlc progress, from real session
+events and the files in your project.
 
 It began as a fork of [claude-flightdeck](https://github.com/scasella/claude-flightdeck) by Stephen Casella (MIT); the pure
-reducers and the style of the first line come from it. See `NOTICE`.
+reducers and the style of the statusline come from it. See `NOTICE`.
 
 > Claude Code mods are an early-access feature and the API may change. Needs Claude Code 2.1.296 or later.
 
@@ -24,35 +24,23 @@ use the + next to the prompt box, then Plugins, then Add marketplace.
 
 ## What it shows
 
-An orange-bordered band, two lines:
+One line, the same on the terminal and the desktop app. It appears only in a project where ai-sdlc has written `.sdlc/local/band.json` (see below):
 
 ```
-○ idle · Opus 5.5 high · ctx 42% · 5h 85% 43m · 7d 31% 2d4h · $1.23/$16.03
-AI-SDLC ✔─✔─✔─◉─○─○─○─○  now Build · next Verify · done 8/9 · 2026-10-20-playable-loop · tier M
+AI-SDLC · Build · Tier M · 2026-10-20-playable-loop         ✔─✔─✔─◉─○─○─○─○  8/9
 ```
 
-**Line 1** is `● working` or `○ idle`, the model with its effort, `ctx`, `5h` and `7d` as percents (green to 50%, orange above, red
-from 80%) with the time to each reset, and the spend as `$session/$project`.
+- the title, the step now (in orange), the tier and the change, each after a small dot (the change is cut at the edge when the
+  window is narrow); a closed change has no step now, and its outcome follows the change;
+- the eight steps (Intent, Spec, Plan, Build, Verify, Review, Ship, Knowledge) as a progress line: marks joined by lines, lit up
+  to the current step; a skipped step is dashed (`⊖` in the terminal);
+- the build's count (steps that passed out of all of them, the passed number in green; not shown for a build of one step).
 
-**Line 2** appears only in a project that has `.sdlc/` or `docs/sdlc/`:
-- an eight-step progress line (Intent, Spec, Plan, Build, Verify, Review, Ship, Knowledge): marks joined by lines, lit up to
-  the current step; a skipped step is `⊖`;
-- the step now (orange) and the step next (blue), with the build's progress after them (`done 8/9`, in green: steps that
-  passed out of all of them; not shown for a build of one step);
-- the change and its tier. A closed change reads `closed` in place of now and next. What does not fit is cut from the right.
-
-**On the desktop app** the band is one line of AI-SDLC and nothing else, and the host frames it and draws its close control (`×`),
-as it does for its other panels:
-
-```
-AI-SDLC · Build · Tier M · 2026-10-20-playable-loop         ✔─✔─✔─◉─○─○─○─○  8/9   ×
-```
-
-The title, the step now (in orange), the tier and the change, each after a small dot (cut at the edge when the window is narrow), the pipeline as one small drawing with no labels (a
-ticked disc for a step done, a ringed dot with a halo for the step now, an open ring for a step to come, a dashed ring for one
-skipped), the build's count (steps that passed out of all of them, the passed number in green; not shown for a build of one step)
-and the close control. It is all one size of type, in the host's font. A project with no ai-sdlc files has no band there. The
-editor and the phones get the two-row card (the limits as bars, the spend, then the AI-SDLC row) in an orange border.
+The terminal draws it in glyphs inside an orange border; hide it with `/session-board close`. The desktop app draws the pipeline as one
+small drawing (a ticked disc for a step done, a ringed dot with a halo for the step now, an open ring for a step to come), with a
+close control (`×`) at the end, in the host's own frame (the band draws no border of its own), all in one size of type in the host's font. A
+project with no ai-sdlc files has no band on either. The editor and the phones get a two-row card (the model and its effort, the limits
+as bars, the spend, then the AI-SDLC row) in an orange border.
 
 ## Commands
 
@@ -62,17 +50,39 @@ whether it shows when a session starts.
 ## When something is unavailable
 
 Any value that cannot be read shows `N/A` and the band keeps drawing: no rate-limit data, a missing cost ledger, a malformed
-change file. A project with no ai-sdlc files has no second line.
+band file. A project without one has no band; the board never works the chain out itself.
 
 ## What it reads, and what it never does
 
-It reads the session's own events; `.sdlc/*.json`; the active change's `docs/sdlc/<change>/*.md` front matter;
-`knowledges/log.md`; and, once per project, `~/.claude/statusline-cost/`. The project's spend is the board's own ledger in the
+It reads the session's own events; `.sdlc/local/band.json`; and, once per project, `~/.claude/statusline-cost/`. The project's spend is the board's own ledger in the
 host's store: one record per session, counted as `base + last`, a restarted counter keeping what came before. The first time
 it sees a project it copies those statusline records once; after that it never reads them again.
 
 It never writes to your project, runs no program, makes no network request and calls no model. It draws ids, stages and counts,
 never transcript or intent text, and strips control characters from everything it reads from your files.
+
+## The band file
+
+ai-sdlc owns where a change stands (its `chainStatus`), so the board does not work it out again: it draws what ai-sdlc writes to
+`.sdlc/local/band.json` whenever the chain changes. The file is JSON, version 1; a file of another version, or one that does not
+parse, is no band:
+
+```json
+{
+  "version": 1,
+  "activeId": "2026-10-20-playable-loop",
+  "tier": "M",
+  "next": "build",
+  "stages": { "intent": "done", "spec": "done", "plan": "done", "build": "current", "verify": "todo", "review": "todo", "ship": "todo", "knowledge": "todo" },
+  "build": [{ "step": "1", "rounds": 1, "model": "sonnet", "verdict": "pass" }]
+}
+```
+
+- `activeId`: the change in progress; `null` (or no change) draws "no active change", and the other fields are then ignored.
+- `stages`: all eight steps, each `done`, `current`, `todo` or `skipped` (tier S skips spec and review; a closed change has no
+  `current`). A missing or bad step makes `stages` unknown, drawn as `stages N/A`.
+- `next`: what `sdlc status` calls the next step, `closed (shipped)` for a closed change; `build`: the build loop's steps, each
+  `verdict` `pass`, another word, or `null` (the band's count is the `pass` rows out of all rows).
 
 ## Options
 
@@ -89,7 +99,7 @@ Set in `/config` or under `pluginConfigs["session-board"].options` in `settings.
 ## Development
 
 `claude plugin test .` runs the tests and `claude plugin validate . --strict` checks the manifest and the module (see
-`CONTRIBUTING.md`). The pure logic is in `hooks/statusline.ts`, `hooks/sdlc.ts` and `hooks/core.ts`; the only code that
+`CONTRIBUTING.md`). The pure logic is in `hooks/statusline.ts`, `hooks/sdlc.ts` (the band file's validation) and `hooks/core.ts`; the only code that
 touches `$.fs` or `$.env` is `hooks/sources.ts`.
 
 ## Licence

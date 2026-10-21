@@ -1,11 +1,10 @@
-// The band's drawing: the AI-SDLC line and the box round it and the main line (main.tsx). Every value that could not be
-// read is null and is drawn as N/A.
+// The band's drawing: the AI-SDLC line in the terminal's glyphs and the box round it, and the two-row card where SVG is drawn (desktop.tsx).
+// Every value that could not be read is null and is drawn as N/A.
 import type { EngineInterface } from 'claude-code'
 
 import type { Sdlc, StageState } from '../types'
 import { widthOf } from './core'
 import type { Colors } from './core'
-import { mainLine } from './main'
 import type { MainProps } from './main'
 import { desktopPanel, desktopRows } from './desktop'
 import { LABELS, STAGES, nowNext, stageLinks } from './sdlc'
@@ -27,61 +26,71 @@ const lit = (els: Els, color: string, text: string, key: string) => {
 }
 
 /**
- * `now Review · next Ship · done 9/10`, as the pieces of one Text: the step in progress (orange, like its mark) and the one after it
- * (sky blue, a skipped step never next), then the build's count (the steps that passed, green, out of all of them; a single step has
- * nothing to count). `fallback` stands for the step now when nothing is in progress: how a closed change closed.
- */
-const statusParts = ({ els, C, sdlc, fallback }: { els: Els; C: Colors; sdlc: Sdlc; fallback: string }) => {
-  const { now, next } = sdlc.stages ? nowNext(sdlc.stages) : { now: null, next: null }
-  return [
-    ...(now ? ['now ', lit(els, C.folder, LABELS[now], 'now'), ...(next ? [' · next ', lit(els, C.border, LABELS[next], 'next')] : [])] : [fallback]),
-    ...(sdlc.build && sdlc.build.length > 1 ? [' · done ', lit(els, C.git, String(sdlc.build.filter(r => r.verdict === 'pass').length), 'done'), `/${sdlc.build.length}`] : []),
-  ]
-}
-
-/**
- * The compact band's second line, titled AI-SDLC: the eight steps as a progress line (marks joined by lines, lit up to the current
- * step), then the step now and the step next with the build's count, the change and the tier, each after a dot. A closed change says
- * so. What does not fit is cut from the right.
+ * The terminal's band, the desktop's line in glyphs: AI-SDLC, the step now, the tier and the change, each after a dot (the change is
+ * cut at the edge), then the eight steps as a progress line (marks joined by lines, lit up to the current step) and the build's
+ * count (the steps that passed, green, out of all of them; a single step has nothing to count). A closed change has no step now:
+ * its outcome follows the change. No ai-sdlc files, no line.
  */
 export const progressLine = ({ els, C, sdlc }: { els: Els; C: Colors; sdlc: Sdlc }) => {
   const { Box, Text } = els
   const stages = sdlc.stages
+  const title = (
+    <Text key="title" bold color={C.border}>
+      AI-SDLC
+    </Text>
+  )
+  const dot = (i: number) => (
+    <Text key={`dot-${i}`} color={C.dim}>
+      {' · '}
+    </Text>
+  )
   if (!sdlc.activeId || !stages) {
     return (
-      <Box key="band-progress">
-        <Text color={C.dim}>{sdlc.activeId ? `AI-SDLC stages ${NA}` : 'AI-SDLC no active change'}</Text>
+      <Box key="band-panel">
+        <Text wrap="truncate">
+          {title}
+          <Text color={C.dim}>{sdlc.activeId ? ` stages ${NA}` : ' no active change'}</Text>
+        </Text>
       </Box>
     )
   }
+  const { now } = nowNext(stages)
   const links = stageLinks(stages)
+  const total = sdlc.build?.length ?? 0
+  const passed = sdlc.build?.filter(r => r.verdict === 'pass').length ?? 0
+  const parts = [
+    title,
+    ...(now ? [lit(els, C.folder, LABELS[now], 'now')] : []),
+    <Text key="tier">
+      <Text color={C.dim}>Tier </Text>
+      {lit(els, C.border, (sdlc.tier ?? NA).toUpperCase(), 'tier')}
+    </Text>,
+    <Text key="change" color={C.dim}>
+      {sdlc.activeId}
+      {now ? '' : ` ${(sdlc.next ?? 'closed').replace(/^./, c => c.toUpperCase())}`}
+    </Text>,
+  ]
   return (
-    <Box key="band-progress">
-      <Text wrap="truncate">
-        <Text bold color={C.border}>
-          AI-SDLC
-        </Text>
-        <Text> </Text>
+    <Box key="band-panel" justifyContent="space-between" columnGap={2}>
+      <Text wrap="truncate">{parts.flatMap((part, i) => (i === 0 ? [part] : [dot(i), part]))}</Text>
+      <Text>
         {STAGES.flatMap((stage, i) => [
           <Text key={`mark-${stage}`} bold={stages[stage] === 'current'} color={stages[stage] === 'done' ? C.git : stages[stage] === 'current' ? C.folder : C.dim}>
             {GLYPH[stages[stage]]}
           </Text>,
           ...(i < STAGES.length - 1 ? [<Text key={`link-${stage}`} color={links[i] ? C.git : C.dim}>─</Text>] : []),
         ])}
-        <Text color={C.dim}>{'  '}</Text>
-        <Text color={C.text}>{statusParts({ els, C, sdlc, fallback: 'closed' })}</Text>
-        <Text color={C.dim}>{` · ${sdlc.activeId} · tier `}</Text>
-        {lit(els, C.border, sdlc.tier ?? NA, 'tier')}
+        {total > 1 ? [<Text key="gap">{'  '}</Text>, lit(els, C.git, String(passed), 'done'), <Text key="of" color={C.dim}>{`/${total}`}</Text>] : null}
       </Text>
     </Box>
   )
 }
 
-export type BandProps = Omit<MainProps, 'w'> & { sdlc: Sdlc | null; W: number; surface: string; onClose?: () => void }
+export type BandProps = MainProps & { sdlc: Sdlc | null; W: number; surface: string; onClose?: () => void }
 
 /**
- * The compact band, in an orange border: the main line, and the progress line (none where the project has no
- * ai-sdlc files).
+ * The band: on the desktop app the AI-SDLC line alone, in the host's frame; in the terminal the same line in glyphs, in an orange
+ * border; in the editor and on the phones a two-row card. The caller leaves the surface to the engine where there is nothing to show.
  */
 export const bandRow = (p: BandProps) => {
   const { Box } = p.els
@@ -99,7 +108,6 @@ export const bandRow = (p: BandProps) => {
   }
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={p.C.main} paddingX={1} width={widthOf(p.surface, p.W)}>
-      {mainLine(p)}
       {p.sdlc ? progressLine({ els: p.els, C: p.C, sdlc: p.sdlc }) : null}
     </Box>
   )

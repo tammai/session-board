@@ -54,7 +54,7 @@ export const parseConfig = (o: Readonly<Record<string, unknown>>): Config => ({
 
 // ---------------------------------------------------------------- palette
 
-export type Colors = Record<'border' | 'main' | 'dim' | 'text' | 'folder' | 'git' | 'bold' | 'red' | 'ink' | 'accent', string>
+export type Colors = Record<'border' | 'main' | 'dim' | 'text' | 'folder' | 'git' | 'red' | 'accent', string>
 
 /**
  * `theme` names the person's own theme colours (they follow light, dark and colour-blind themes);
@@ -68,9 +68,7 @@ export const PALETTES: Record<Palette, Colors> = {
     text: 'text',
     folder: '#f07623',
     git: '#59c9a5',
-    bold: '#e0def4',
     red: '#d81e5b',
-    ink: '#262b44',
     accent: '#4a9fd8', // the desktop's blue: deeper than the sky blue, so it reads on a light background too
   },
   pastel: {
@@ -80,9 +78,7 @@ export const PALETTES: Record<Palette, Colors> = {
     text: '#e5e7eb',
     folder: '#f07623',
     git: '#59c9a5',
-    bold: '#e0def4',
     red: '#d81e5b',
-    ink: '#262b44',
     accent: '#4a9fd8', // the desktop's blue: deeper than the sky blue, so it reads on a light background too
   },
 }

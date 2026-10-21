@@ -152,8 +152,8 @@ export const desktopRows = (p: BandProps) => {
 
 /**
  * The desktop app's band: one line of the AI-SDLC alone: the title, the step now, the tier, the change (cut at the edge), the small pipeline with
- * the build's count after it, and the close control. No border of its own: the host frames the band and draws the close control, as
- * it does for its other panels. Null without ai-sdlc files, or off the desktop.
+ * the build's count after it, and the close control. No border of its own: the host frames the band (a grey rounded box), and a
+ * second one doubles it. Null without ai-sdlc files, or off the desktop.
  */
 export const desktopPanel = (p: BandProps & { onClose: () => void }) => {
   const { els, C, sdlc } = p
@@ -211,8 +211,8 @@ export const desktopPanel = (p: BandProps & { onClose: () => void }) => {
         </Text>
       ) : null}
       {/* the host draws a dismiss Button's label as its text where there is no child: both are the icon, so it is always × */}
-      <Button key="close" role="dismiss" label="×" onPress={p.onClose}>
-        <Text color={C.dim}>×</Text>
+      <Button key="close" role="dismiss" plain label="×" onPress={p.onClose}>
+        <Text color={C.text}>×</Text>
       </Button>
     </Box>
   )

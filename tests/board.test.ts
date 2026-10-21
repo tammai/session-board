@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { TIER_M, TIER_S } from './fixtures/sdlc'
+import { REVIEW, SHIPPED as SHIPPED_BAND, band as bandFile, steps } from './fixtures/sdlc'
 
 // ---------------------------------------------------------------- a mocked host
 
@@ -10,22 +10,11 @@ const ROOT = '/work/session-board'
 const LEDGER = '/home/me/.claude/statusline-cost/46ec31dcd0eb7eec' // sha1(ROOT)[:16]
 const ID = '2026-10-19-open-change'
 
-const openMDocs = () => {
-  const { review: _review, ...rest } = TIER_M
-  return { ...rest, intent: (TIER_M.intent as string).replace('outcome: shipped\n', '') }
-}
-
-const SHIPPED = '2026-10-14-ship-notifies-the-human-when-a-change-is-closed'
+const SHIPPED = SHIPPED_BAND.activeId as string
 
 const project = (): Record<string, string> => ({
-  [`${ROOT}/.sdlc/config.json`]: '{}',
-  [`${ROOT}/.sdlc/local/state.json`]: JSON.stringify({
-    active: ID,
-    build: { [ID]: { steps: { spec: { rounds: 2, model: 'sonnet', verdict: 'pass' } } } },
-  }),
-  ...Object.fromEntries(Object.entries(TIER_S).map(([k, v]) => [`${ROOT}/docs/sdlc/${SHIPPED}/${k}.md`, v])),
+  [`${ROOT}/.sdlc/local/band.json`]: bandFile(REVIEW),
   [`${LEDGER}/sess-0`]: '{"base": 10.0, "last": 4.8}',
-  ...Object.fromEntries(Object.entries(openMDocs()).map(([k, v]) => [`${ROOT}/docs/sdlc/${ID}/${k}.md`, v])),
 })
 
 const MIN = 60_000
@@ -37,6 +26,9 @@ const USAGE = {
 
 /** The engine resolves a path to the platform's form (`C:\work\x` on Windows); the fake project keys are POSIX. */
 const posix = (path: string) => path.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '')
+
+/** How many files the host has been asked for or to list, so a test can tell when the scan has settled. */
+let reads = 0
 
 /** Answers what sits beneath the plugin: the session, its files and the environment. */
 const host = (on: On, files: Record<string, string> = project(), hold?: Promise<unknown>, settings: Record<string, unknown> = {}) => {
@@ -53,12 +45,14 @@ const host = (on: On, files: Record<string, string> = project(), hold?: Promise<
   on('session.usage', () => ({ value: USAGE }) as never)
   on('ui.status', () => ({ value: undefined }))
   on('fs.read', async (_$, e) => {
+    reads++
     if (hold) await hold
     const text = files[posix(e.path)]
     if (text === undefined) throw new Error(`ENOENT ${e.path}`)
     return { value: text }
   })
   on('fs.list', (_$, e) => {
+    reads++
     const dir = posix(e.path)
     const seen = new Map<string, 'file' | 'dir'>()
     for (const p of Object.keys(files)) {
@@ -87,6 +81,11 @@ type Test$ = Engine
 
 const begin = async ($: Test$) => {
   await $.session.start({ cwd: ROOT, surface: 'terminal' } as never)
+  // The repo scan runs after the start returns, and the terminal and the desktop draw nothing until it has read: wait until the reads stop.
+  for (let quiet = 0, seen = -1; quiet < 3; await new Promise(r => setTimeout(r, 10))) {
+    quiet = reads === seen ? quiet + 1 : 0
+    seen = reads
+  }
 }
 
 /** One main-loop request, so the board learns the effort level. */
@@ -111,21 +110,20 @@ const DONE = '#59c9a5' // the done count: green, like a step done
 
 // ---------------------------------------------------------------- the band
 
-test('the band is above the prompt from the start: the main line and one AI-SDLC line in an orange border', async ($, on) => {
+test('the band is above the prompt from the start: one AI-SDLC line in an orange border, as on the desktop', async ($, on) => {
   host(on)
   await begin($)
   const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  // line 1: working or idle, model and effort, context, the two limits, the spend
-  expect(await rowOf(ui, 'band-main')).toBe('○ idle · Opus 5.5 N/A · ctx 42% · 5h 85% 43m · 7d N/A · $1.23/$16.03') // each limit's reset time follows its percent
-  expect((await ui.find({ text: /^ 43m$/ }))?.props.color).toBe('inactive') // in grey, as in the statusline
-  // line 2: the eight steps as a progress line, the step now, the step next, the change and its tier
-  expect(await rowOf(ui, 'band-progress')).toBe(`AI-SDLC ✔─✔─✔─✔─✔─◉─○─○  now Review · next Ship · ${ID} · tier M`)
-  expect((await ui.find({ type: 'Text', text: /^now Review · next Ship$/ }))?.props.color).toBe('text') // neutral
+  // the title, the step now, the tier and the change, each after a dot; then the eight steps as a progress line
+  expect(await rowOf(ui, 'band-panel')).toBe(`AI-SDLC · Review · Tier M · ${ID}✔─✔─✔─✔─✔─◉─○─○`)
+  expect(await ui.find({ key: 'band-main' })).toBeUndefined() // no main line (model, limits, spend)
+  expect(await ui.find({ text: /Opus|ctx|\$|now |next /i })).toBeUndefined() // and no labels, no second line
   expect((await ui.find({ text: /^AI-SDLC$/ }))?.props.color).toBe(BLUE) // the line is titled
-  for (const [value, color] of [['Review', NOW], ['Ship', BLUE], ['M', BLUE]]) expect([value, (await ui.find({ type: 'Text', text: new RegExp(`^${value}$`) }))?.props.color]).toEqual([value, color])
+  for (const [value, color] of [['Review', NOW], ['M', BLUE]]) expect([value, (await ui.find({ type: 'Text', text: new RegExp(`^${value}$`) }))?.props.color]).toEqual([value, color])
   const drawn = JSON.stringify(await ui.drawn())
   expect(drawn).toContain('"borderStyle":"round"')
   expect(drawn).toContain('"borderColor":"claude"')
+  expect(drawn).not.toContain('"role":"dismiss"') // the terminal has no close control: /session-board close
   await ui.unmount()
 })
 
@@ -160,7 +158,7 @@ test('close hides the band and open shows it again; a survey takes its place; an
   await begin($)
   const shown = async (hasSurvey = false) => {
     const ui = await $.ui.mount({ ...band(100, hasSurvey), surface: 'terminal' })
-    const isBoard = (await ui.find({ key: 'band-main' })) !== undefined
+    const isBoard = (await ui.find({ key: 'band-panel' })) !== undefined
     const isEngine = (await ui.find({ text: /^the engine band$/ })) !== undefined
     await ui.unmount()
     return { isBoard, isEngine }
@@ -177,40 +175,36 @@ test('close hides the band and open shows it again; a survey takes its place; an
 test("the effort shows before the first request, from the settings, and a request's own value replaces it", async ($, on) => {
   host(on, project(), undefined, { modelSettings: { 'claude-opus-5-5': { effortLevel: 'xhigh' } } })
   await begin($)
-  const before = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(before, 'band-main')).toContain('Opus 5.5 xhigh')
+  const before = await $.ui.mount({ ...band(100), surface: 'vscode' })
+  expect(await rowOf(before, 'band-main')).toContain('Opus 5.5xhigh')
   await before.unmount()
   await oneStep($) // the request says high
-  const after = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(after, 'band-main')).toContain('Opus 5.5 high')
+  const after = await $.ui.mount({ ...band(100), surface: 'vscode' })
+  expect(await rowOf(after, 'band-main')).toContain('Opus 5.5high')
   await after.unmount()
 })
 
-test('the band says working during a turn and idle after it', async ($, on) => {
+test('the editor band says working during a turn and idle after it', async ($, on) => {
   host(on)
   on('turn.start', (_$, e) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
   await begin($)
   await $.turn.start({ text: 'go', turnId: 'T1' } as never)
-  const working = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(working, 'band-main')).toMatch(/^● working · /)
+  const working = await $.ui.mount({ ...band(100), surface: 'vscode' })
+  expect(await rowOf(working, 'band-main')).toMatch(/^●Working/)
   await working.unmount()
   await $.turn.complete({ turnId: 'T1', reason: 'answer', durationMs: 1, answer: '' } as never)
-  const idle = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(idle, 'band-main')).toMatch(/^○ idle · /)
+  const idle = await $.ui.mount({ ...band(100), surface: 'vscode' })
+  expect(await rowOf(idle, 'band-main')).toMatch(/^○Idle/)
   await idle.unmount()
 })
 
-test('with nothing readable the band still draws, every missing value as N/A', async ($, on) => {
+test('with nothing readable the editor band still draws, every missing value as N/A', async ($, on) => {
   mock.clock(on)
   on('command.register', () => ({ value: { command: 'session-board' } }) as never)
   on('session.start', () => ({ cwd: ROOT }) as never)
   on('ui.status', () => ({ value: undefined }))
   await begin($)
-  const terminal = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(terminal, 'band-main')).toBe('○ idle · N/A N/A · ctx N/A · 5h N/A · 7d N/A · N/A/N/A') // the model and the effort, the limits and the spend, all unknown
-  expect(await terminal.find({ key: 'band-progress' })).toBeUndefined() // no project, no ai-sdlc line
-  await terminal.unmount()
   const desktop = await $.ui.mount({ ...band(100), surface: 'vscode' })
   expect(await rowOf(desktop, 'band-main')).toBe('○IdleN/AN/ActxN/A5hN/A7dN/AN/A / N/A')
   expect(await desktop.find({ key: 'band-progress' })).toBeUndefined()
@@ -219,15 +213,15 @@ test('with nothing readable the band still draws, every missing value as N/A', a
 
 // ---------------------------------------------------------------- AI-SDLC
 
-test('a build of several steps is one count after now and next: the steps that passed out of all of them', async ($, on) => {
+test('a build of several steps is one count after the pipeline: the steps that passed out of all of them', async ($, on) => {
   const files = project()
-  const steps = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [String(i), { rounds: 1, model: 'sonnet', verdict: i < 8 ? 'pass' : null }]))
-  files[`${ROOT}/.sdlc/local/state.json`] = JSON.stringify({ active: ID, dirty: true, build: { [ID]: { steps } } })
+  const rows = Array.from({ length: 9 }, (_, i) => ({ step: String(i), rounds: 1, model: 'sonnet', verdict: i < 8 ? 'pass' : null }))
+  files[`${ROOT}/.sdlc/local/band.json`] = bandFile({ ...REVIEW, next: 'build', stages: steps('done', 'done', 'done', 'current', 'todo', 'todo', 'todo', 'todo'), build: rows })
   host(on, files)
   await begin($)
   const terminal = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(terminal, 'band-progress')).toBe(`AI-SDLC ✔─✔─✔─◉─○─○─○─○  now Build · next Verify · done 8/9 · ${ID} · tier M`)
-  for (const [value, color] of [['Build', NOW], ['Verify', BLUE], ['8', DONE], ['M', BLUE]]) expect([value, (await terminal.find({ type: 'Text', text: new RegExp(`^${value}$`) }))?.props.color]).toEqual([value, color])
+  expect(await rowOf(terminal, 'band-panel')).toBe(`AI-SDLC · Build · Tier M · ${ID}✔─✔─✔─◉─○─○─○─○  8/9`)
+  for (const [value, color] of [['Build', NOW], ['8', DONE], ['M', BLUE]]) expect([value, (await terminal.find({ type: 'Text', text: new RegExp(`^${value}$`) }))?.props.color]).toEqual([value, color])
   await terminal.unmount()
   // where SVG is drawn the count is a small bar and `8/9`, the 8 in green
   const desktop = await $.ui.mount({ ...band(100), surface: 'vscode' })
@@ -244,11 +238,11 @@ test('a build of several steps is one count after now and next: the steps that p
 
 test('a tier S change shows its spec and review as skipped; a closed one says closed', async ($, on) => {
   const files = project()
-  files[`${ROOT}/.sdlc/local/state.json`] = JSON.stringify({ active: SHIPPED, dirty: false })
+  files[`${ROOT}/.sdlc/local/band.json`] = bandFile(SHIPPED_BAND)
   host(on, files)
   await begin($)
   const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(ui, 'band-progress')).toBe(`AI-SDLC ✔─⊖─✔─✔─✔─⊖─✔─○  closed · ${SHIPPED} · tier S`) // nothing is in progress
+  expect(await rowOf(ui, 'band-panel')).toBe(`AI-SDLC · Tier S · ${SHIPPED} Closed (shipped)✔─⊖─✔─✔─✔─⊖─✔─○`) // nothing is in progress: the outcome follows the change
   await ui.unmount()
   // on the desktop a closed change has no step now: the dots separate what there is, and its outcome follows the change
   const desktop = await $.ui.mount({ ...band(100), surface: 'desktop' })
@@ -256,36 +250,44 @@ test('a tier S change shows its spec and review as skipped; a closed one says cl
   await desktop.unmount()
 })
 
-test('a change that has passed verify and is not yet shipped has Ship in progress; a skipped step is never next', async ($, on) => {
-  const files = project()
-  const id = '2026-10-19-ship-is-now'
-  const open = (TIER_S.intent as string).replace('outcome: shipped\n', '')
-  for (const [k, v] of Object.entries({ ...TIER_S, intent: open })) files[`${ROOT}/docs/sdlc/${id}/${k}.md`] = v
-  files[`${ROOT}/.sdlc/local/state.json`] = JSON.stringify({ active: id, dirty: false })
-  host(on, files)
-  await begin($)
-  const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(ui, 'band-progress')).toBe(`AI-SDLC ✔─⊖─✔─✔─✔─⊖─◉─○  now Ship · next Knowledge · ${id} · tier S`)
-  await ui.unmount()
-})
-
-test('a project with no ai-sdlc files has no AI-SDLC line', async ($, on) => {
+test('a project with no ai-sdlc files has no band in the terminal, as on the desktop; the editor keeps its card', async ($, on) => {
   host(on, { [`${ROOT}/README.md`]: '# hi' })
+  on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'Text', children: ['the engine band'] }) as never)
   await begin($)
   const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await ui.find({ text: /^AI-SDLC/ })).toBeUndefined()
-  expect(await ui.find({ key: 'band-main' })).toBeDefined() // the rest of the band is unaffected
+  expect(await ui.find({ text: /^the engine band$/ })).toBeDefined()
+  expect(await ui.find({ key: 'band-panel' })).toBeUndefined()
   await ui.unmount()
+  const editor = await $.ui.mount({ ...band(100), surface: 'vscode' })
+  expect(await editor.find({ text: /^AI-SDLC/ })).toBeUndefined()
+  expect(await editor.find({ key: 'band-main' })).toBeDefined() // the rest of the card is unaffected
+  await editor.unmount()
 })
 
-test('a project with only .sdlc/config.json shows the line with what is missing read as N/A', async ($, on) => {
-  host(on, { [`${ROOT}/.sdlc/config.json`]: '{}' })
+test('a band file with no active change reads "no active change"; an .sdlc folder with no band file has no band', async ($, on) => {
+  host(on, { [`${ROOT}/.sdlc/local/band.json`]: bandFile({ activeId: null }) })
   await begin($)
-  for (const [surface, text] of [['terminal', 'AI-SDLC no active change'], ['vscode', 'AI-SDLCno active change']] as const) {
+  for (const [surface, key, text] of [['terminal', 'band-panel', 'AI-SDLC no active change'], ['vscode', 'band-progress', 'AI-SDLCno active change']] as const) {
     const ui = await $.ui.mount({ ...band(100), surface })
-    expect(await rowOf(ui, 'band-progress')).toBe(text)
+    expect(await rowOf(ui, key)).toBe(text)
     await ui.unmount()
   }
+})
+
+test('an .sdlc folder from an ai-sdlc that writes no band file shows no band, and so does a file of another version', async ($, on) => {
+  const files: Record<string, string> = { [`${ROOT}/.sdlc/config.json`]: '{}' }
+  host(on, files)
+  on('turn.complete', () => ({ text: '' }))
+  on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'Text', children: ['the engine band'] }) as never)
+  await begin($)
+  const none = await $.ui.mount({ ...band(100), surface: 'terminal' })
+  expect(await none.find({ text: /^the engine band$/ })).toBeDefined()
+  await none.unmount()
+  files[`${ROOT}/.sdlc/local/band.json`] = JSON.stringify({ version: 2, ...REVIEW })
+  await $.turn.complete({ turnId: 'T1', reason: 'answer', durationMs: 1, answer: '' } as never)
+  const other = await $.ui.mount({ ...band(100), surface: 'terminal' })
+  expect(await other.find({ key: 'band-panel' })).toBeUndefined()
+  await other.unmount()
 })
 
 // ---------------------------------------------------------------- the desktop
@@ -306,7 +308,7 @@ test('on the desktop the band is one line of AI-SDLC with no border of its own a
   expect(drawn).toContain(small)
   expect(drawn.match(/"type":"Svg"/g)).toHaveLength(1) // the one pipeline drawing
   expect(drawn.indexOf(small)).toBeLessThan(drawn.indexOf('"role":"dismiss"')) // before the close control
-  expect(drawn).not.toContain('borderStyle') // the host frames the band
+  expect(drawn).not.toContain('borderStyle') // the host frames the band; a border of ours would double it
   expect(drawn).not.toContain('"size"') // one size of type throughout
   expect(drawn).toContain('"role":"dismiss"') // and draws its close control at the trailing edge
   expect(drawn).toContain('"label":"×"') // the control is always ×, as a label and as its face
@@ -341,10 +343,10 @@ test('a turn end always re-reads the repo, even right after another read', async
   host(on, files)
   on('turn.complete', () => ({ text: '' }))
   await begin($)
-  files[`${ROOT}/.sdlc/local/state.json`] = JSON.stringify({ active: null, dirty: false })
+  files[`${ROOT}/.sdlc/local/band.json`] = bandFile({ activeId: null })
   await $.turn.complete({ turnId: 'T1', reason: 'answer', durationMs: 1, answer: '' } as never)
   const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(ui, 'band-progress')).toBe('AI-SDLC no active change')
+  expect(await rowOf(ui, 'band-panel')).toBe('AI-SDLC no active change')
   await ui.unmount()
 })
 
@@ -354,11 +356,11 @@ test('a call that can change files re-reads the repo, at most once every two sec
   on('tool.call', () => ({ result: 'ok' }) as never)
   await begin($)
   await clock.advance(3000) // past the debounce of the read at the start
-  files[`${ROOT}/.sdlc/local/state.json`] = JSON.stringify({ active: null, dirty: false })
+  files[`${ROOT}/.sdlc/local/band.json`] = bandFile({ activeId: null })
   await $.tool.call({ tool: 'Edit', input: { file_path: '/a' }, tool_use_id: 'k1' } as never)
   await clock.advance(0)
   const ui = await $.ui.mount({ ...band(100), surface: 'terminal' })
-  expect(await rowOf(ui, 'band-progress')).toBe('AI-SDLC no active change')
+  expect(await rowOf(ui, 'band-panel')).toBe('AI-SDLC no active change')
   await ui.unmount()
 })
 

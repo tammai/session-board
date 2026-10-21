@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { readSdlc, trackProjectCost } from '../hooks/sources'
 import type { Io } from '../hooks/sources'
-import { TIER_M, TIER_S } from './fixtures/sdlc'
+import { REVIEW, band } from './fixtures/sdlc'
 
 type Fake = Io & { reads: string[] }
 
@@ -44,50 +44,20 @@ const fakeIo = (files: Record<string, string>, extra: Partial<Io> = {}, store = 
   return io
 }
 
-const change = (id: string, docs: Record<string, string>, files: Record<string, string> = {}) => {
-  for (const [kind, text] of Object.entries(docs)) files[`/p/docs/sdlc/${id}/${kind}.md`] = text
-  return files
-}
-
-const SHIPPED = '2026-10-14-ship-notifies-the-human-when-a-change-is-closed'
-const OPEN = '2026-10-19-open-change'
-
-const openDocs = () => {
-  const { review: _review, ...rest } = TIER_M
-  return { ...rest, intent: (TIER_M.intent as string).replace('outcome: shipped\n', '') }
-}
-
-test('the active change is read from the repo files; a project without them gives none', async () => {
+test('the AI-SDLC line is read from the band file ai-sdlc wrote, and from nothing else; no file, no line', async () => {
   const files: Record<string, string> = {
-    '/p/.sdlc/config.json': '{"artifactsDir":"docs/sdlc"}',
-    '/p/.sdlc/local/state.json': JSON.stringify({
-      active: OPEN,
-      dirty: true,
-      build: { [OPEN]: { steps: { spec: { rounds: 2, model: 'sonnet', verdict: 'pass' } } } },
-    }),
+    '/p/.sdlc/local/band.json': band(REVIEW),
+    '/p/.sdlc/local/state.json': JSON.stringify({ active: 'another' }),
+    '/p/docs/sdlc/another/intent.md': '---\nartifact: intent\n---\n',
   }
-  change(SHIPPED, TIER_S, files)
-  change(OPEN, openDocs(), files)
   const reader = fakeIo(files)
-  const sdlc = await readSdlc(reader, '/p')
-  expect(sdlc?.activeId).toBe(OPEN)
-  expect(sdlc?.tier).toBe('M')
-  expect(sdlc?.next).toBe('review')
-  expect(sdlc?.stages?.review).toBe('current')
-  expect(sdlc?.build).toEqual([{ step: 'spec', rounds: 2, model: 'sonnet', verdict: 'pass' }])
-  expect(sdlc?.stages?.knowledge).toBe('todo')
-  // only the active change is read: not the others, and not the backlog
-  expect(reader.reads.some(p => p.includes(SHIPPED) || p.includes('backlog'))).toBe(false)
-
+  expect(await readSdlc(reader, '/p')).toEqual(REVIEW)
+  expect(reader.reads).toEqual(['/p/.sdlc/local/band.json']) // the state and the change's documents are not read
   expect(await readSdlc(fakeIo({}), '/empty')).toBe(null)
-
-  // the knowledge step is done once knowledges/log.md has a line for the active change
-  files['/p/knowledges/log.md'] = `- ${OPEN}: concepts written
-`
-  expect((await readSdlc(fakeIo(files), '/p'))?.stages?.knowledge).toBe('done')
+  expect(await readSdlc(fakeIo({ '/p/.sdlc/config.json': '{}' }), '/p')).toBe(null) // an .sdlc folder with no band file
 })
 
-test('anything unreadable is null, never a throw: failing io, garbage json, a change with no front matter', async () => {
+test('anything unreadable is null, never a throw: failing io, garbage json, a file of another shape', async () => {
   const dead = fakeIo({}, {
     read: async () => {
       throw new Error('boom')
@@ -98,20 +68,7 @@ test('anything unreadable is null, never a throw: failing io, garbage json, a ch
   })
   expect(await trackProjectCost(dead, '/p', 'live', null)).toBe(null)
   expect(await readSdlc(dead, '/p')).toBe(null)
-
-  const files: Record<string, string> = {
-    '/p/.sdlc/config.json': '{not json',
-    '/p/.sdlc/local/state.json': 'garbage',
-  }
-  change(SHIPPED, TIER_S, files)
-  files['/p/docs/sdlc/2026-10-20-broken/intent.md'] = 'no front matter here'
-  files['/p/docs/sdlc/adr/0001.md'] = '# an ADR, not a change'
-  const sdlc = await readSdlc(fakeIo(files), '/p')
-  expect(sdlc).toEqual({ activeId: null, tier: null, stages: null, next: null, build: null })
-
-  // an active change whose front matter cannot be read has its stages left unknown
-  files['/p/.sdlc/local/state.json'] = JSON.stringify({ active: '2026-10-20-broken' })
-  expect(await readSdlc(fakeIo(files), '/p')).toEqual({ activeId: '2026-10-20-broken', tier: null, stages: null, next: null, build: [] })
+  for (const text of ['garbage', '[]', '"x"', 'null', '{"version":1']) expect(await readSdlc(fakeIo({ '/p/.sdlc/local/band.json': text }), '/p')).toBe(null)
 })
 
 test("the project total is the board's own ledger: the statusline's records are imported once, never read again", async () => {
